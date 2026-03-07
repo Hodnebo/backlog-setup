@@ -1,0 +1,24 @@
+{
+  "name": "backlog-setup",
+  "version": "1.0.0",
+  "description": "One-command AI kanban board with semantic search for any repo.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hodnebo/backlog-setup.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Hodnebo/backlog-setup/issues"
+  },
+  "homepage": "https://github.com/Hodnebo/backlog-setup#readme",
+  "dependencies": {
+    "mcp-local-rag": "^0.8.0"
+  }
+}

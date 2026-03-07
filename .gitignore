@@ -1,0 +1,12 @@
+# MCP configs (local to this machine)
+.mcp.json
+opencode.json
+
+# RAG vector database
+.lancedb/
+
+# RAG model cache
+.mcp-local-rag-models/
+
+# Node
+node_modules/
