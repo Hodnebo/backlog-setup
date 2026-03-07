@@ -92,11 +92,38 @@ backlog task view TASK-1         # View a specific task
 
 1. Scans `backlog/` recursively for `.md`, `.txt`, `.pdf`, `.docx` files
 2. Computes SHA-256 content hashes and compares against `.lancedb/.ingest-hashes.json`
-3. Ingests only new or changed files into LanceDB
-4. Removes deleted files from the vector index
-5. Starts the real MCP server over stdio
+3. **Preprocesses backlog tasks** — strips YAML noise, HTML markers, and assembles clean embedding-friendly text
+4. Ingests only new or changed files into LanceDB
+5. Removes deleted files from the vector index
+6. Starts the real MCP server over stdio
 
 Cold start (model loading): ~15s. Warm start (no changes): instant. One new file: ~5s.
+
+### Backlog task preprocessing
+
+Raw backlog task files contain YAML frontmatter, dates, HTML section markers, and other noise that degrades embedding quality. The auto-ingest wrapper detects backlog tasks (files with `id:` and `title:` in YAML frontmatter) and preprocesses them:
+
+- Extracts: title, labels, priority, description
+- Strips: dates, ordinals, empty arrays, HTML markers (`<!-- SECTION:... -->`)
+- Assembles: `"title; labels: x, y; priority: z; description text"`
+- Uses **semicolons** as separators (not periods) — this is critical because `mcp-local-rag`'s `SemanticChunker` uses `Intl.Segmenter` which splits on periods, creating tiny sentences that fall below the 50-char minimum chunk threshold
+- Pads short texts to 50+ characters to avoid being filtered out
+
+Non-backlog files (`.txt`, `.pdf`, `.docx`, regular `.md`) are ingested raw.
+
+## Performance
+
+Tested with 110 tasks across 10 domains (auth, database, API, frontend, DevOps, monitoring, security, testing, documentation, performance):
+
+| Metric | Result |
+|--------|--------|
+| Ingestion success | **110/110** (100%) |
+| Semantic query accuracy | **10/10** queries passed |
+| Average precision | 68.5% |
+| Average recall | **80.0%** |
+| Average response size | ~956 tokens per query |
+
+Each `query_documents` call returns relevant results in ~956 tokens — well within context-friendly bounds for AI editors.
 
 ## Architecture
 
