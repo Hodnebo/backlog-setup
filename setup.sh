@@ -154,7 +154,7 @@ else
       "env": {
         "BASE_DIR": "$TARGET_DIR/backlog",
         "DB_PATH": "$TARGET_DIR/.lancedb",
-        "CACHE_DIR": "$TARGET_DIR/.mcp-local-rag-models"
+        "CACHE_DIR": "$HOME/.mcp-local-rag-models"
       }
     }
   }
@@ -185,7 +185,7 @@ else
       "environment": {
         "BASE_DIR": "$TARGET_DIR/backlog",
         "DB_PATH": "$TARGET_DIR/.lancedb",
-        "CACHE_DIR": "$TARGET_DIR/.mcp-local-rag-models"
+        "CACHE_DIR": "$HOME/.mcp-local-rag-models"
       },
       "enabled": true
     }
@@ -232,19 +232,21 @@ fi
 # Pre-download embedding model (so first MCP startup is fast)
 # ─────────────────────────────────────────────────────────────────────────────
 
-if [ -d ".mcp-local-rag-models/Xenova" ]; then
-  ok "Embedding model already cached"
+SHARED_CACHE="$HOME/.mcp-local-rag-models"
+
+if [ -d "$SHARED_CACHE/Xenova" ]; then
+  ok "Embedding model already cached ($SHARED_CACHE)"
 else
-  info "Pre-downloading embedding model (~90MB, one-time)..."
+  info "Pre-downloading embedding model (~90MB, one-time) to $SHARED_CACHE..."
   BASE_DIR="$TARGET_DIR/backlog" \
   DB_PATH="$TARGET_DIR/.lancedb" \
-  CACHE_DIR="$TARGET_DIR/.mcp-local-rag-models" \
+  CACHE_DIR="$SHARED_CACHE" \
   node -e "
     import('mcp-local-rag/dist/server/index.js').then(async ({ RAGServer }) => {
       const s = new RAGServer({
         dbPath: '$TARGET_DIR/.lancedb',
         modelName: 'Xenova/all-MiniLM-L6-v2',
-        cacheDir: '$TARGET_DIR/.mcp-local-rag-models',
+        cacheDir: '$SHARED_CACHE',
         baseDir: '$TARGET_DIR/backlog',
         maxFileSize: 104857600,
       });
@@ -254,7 +256,7 @@ else
       process.exit(0);
     }).catch(e => { console.error(e.message); process.exit(0); });
   " 2>/dev/null || warn "Model pre-download skipped (will download on first use)"
-  ok "Embedding model cached"
+  ok "Embedding model cached at $SHARED_CACHE"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────

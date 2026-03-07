@@ -16,7 +16,7 @@
  * Required env vars (set by MCP client config):
  *   BASE_DIR  — root directory to scan for files
  *   DB_PATH   — LanceDB storage directory
- *   CACHE_DIR — embedding model cache directory
+ *   CACHE_DIR — embedding model cache directory (default: ~/.mcp-local-rag-models)
  *
  * Optional env vars:
  *   MODEL_NAME    — HuggingFace model (default: Xenova/all-MiniLM-L6-v2)
@@ -28,10 +28,11 @@ import { readdir, readFile } from "node:fs/promises";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, resolve, extname, basename } from "node:path";
+import { homedir } from "node:os";
 
 const BASE_DIR = process.env.BASE_DIR || process.cwd();
 const DB_PATH = process.env.DB_PATH || join(BASE_DIR, ".lancedb");
-const CACHE_DIR = process.env.CACHE_DIR || join(BASE_DIR, ".rag-models");
+const CACHE_DIR = process.env.CACHE_DIR || join(homedir(), ".mcp-local-rag-models");
 const MODEL_NAME = process.env.MODEL_NAME || "Xenova/all-MiniLM-L6-v2";
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "104857600", 10);
 const MIN_CHUNK_LENGTH = 50;

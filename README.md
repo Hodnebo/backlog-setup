@@ -44,7 +44,7 @@ That's it. Open the project in OpenCode, Claude Code, or Cursor — both MCP ser
 5. Copies `rag-server.mjs` (auto-ingest wrapper)
 6. Writes `.mcp.json` (Claude Code / Cursor) and `opencode.json` (OpenCode)
 7. Updates `.gitignore` to exclude vector DB, model cache, and node_modules
-8. Pre-downloads the embedding model (~90MB, one-time)
+8. Pre-downloads the embedding model (~90MB) to `~/.mcp-local-rag-models` (shared across repos, one-time)
 
 Re-running is safe — it skips steps that are already done.
 
@@ -57,8 +57,9 @@ your-project/
   .mcp.json             # MCP config for Claude Code / Cursor
   opencode.json         # MCP config for OpenCode
   .lancedb/             # Vector database (gitignored)
-  .mcp-local-rag-models/ # Embedding model cache (gitignored)
   node_modules/         # mcp-local-rag dependency (gitignored)
+
+~/.mcp-local-rag-models/  # Shared embedding model cache (~97MB, one-time download)
 ```
 
 ## Usage
@@ -151,16 +152,18 @@ All set automatically by the MCP configs, but can be overridden:
 |----------|---------|-------------|
 | `BASE_DIR` | `./backlog` | Directory to scan for files |
 | `DB_PATH` | `./.lancedb` | LanceDB storage directory |
-| `CACHE_DIR` | `./.mcp-local-rag-models` | Embedding model cache |
+| `CACHE_DIR` | `~/.mcp-local-rag-models` | Embedding model cache (shared across repos) |
 | `MODEL_NAME` | `Xenova/all-MiniLM-L6-v2` | HuggingFace embedding model |
 | `MAX_FILE_SIZE` | `104857600` (100MB) | Max file size for ingestion |
 
-### Sharing the model cache
+### Model cache
 
-By default, each project gets its own model cache (~97MB). To share across projects, set `CACHE_DIR` to a common path in your MCP configs:
+The embedding model (~97MB) is stored in `~/.mcp-local-rag-models` and shared across all repos. The first repo you set up downloads it; subsequent repos reuse the cache instantly.
+
+To use a per-project cache instead, override `CACHE_DIR` in your MCP configs:
 
 ```json
-"CACHE_DIR": "/Users/you/.mcp-local-rag-models"
+"CACHE_DIR": "/path/to/your/project/.mcp-local-rag-models"
 ```
 
 ## License
