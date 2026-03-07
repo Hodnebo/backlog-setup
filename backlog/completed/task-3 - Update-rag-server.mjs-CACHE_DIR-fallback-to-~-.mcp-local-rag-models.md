@@ -1,7 +1,7 @@
 ---
 id: TASK-3
 title: Update rag-server.mjs CACHE_DIR fallback to ~/.mcp-local-rag-models
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-07 20:34'
 labels:

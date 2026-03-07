@@ -33,6 +33,12 @@ Or point it at a directory:
 ~/backlog-setup/setup.sh /path/to/your/project
 ```
 
+To use a per-repo model cache instead of the shared one:
+
+```bash
+~/backlog-setup/setup.sh --local-cache /path/to/your/project
+```
+
 That's it. Open the project in OpenCode, Claude Code, or Cursor — both MCP servers start automatically.
 
 ## What setup.sh does
@@ -44,9 +50,10 @@ That's it. Open the project in OpenCode, Claude Code, or Cursor — both MCP ser
 5. Copies `rag-server.mjs` (auto-ingest wrapper)
 6. Writes `.mcp.json` (Claude Code / Cursor) and `opencode.json` (OpenCode)
 7. Updates `.gitignore` to exclude vector DB, model cache, and node_modules
-8. Pre-downloads the embedding model (~90MB) to `~/.mcp-local-rag-models` (shared across repos, one-time)
+8. Migrates any existing per-repo model cache to the shared location (or removes it if shared cache already exists)
+9. Pre-downloads the embedding model (~90MB) to `~/.mcp-local-rag-models` (shared across repos, one-time)
 
-Re-running is safe — it skips steps that are already done.
+Re-running is safe — it skips steps that are already done and migrates old per-repo caches automatically.
 
 ## Files created in your project
 
@@ -160,11 +167,13 @@ All set automatically by the MCP configs, but can be overridden:
 
 The embedding model (~97MB) is stored in `~/.mcp-local-rag-models` and shared across all repos. The first repo you set up downloads it; subsequent repos reuse the cache instantly.
 
-To use a per-project cache instead, override `CACHE_DIR` in your MCP configs:
+To use a per-project cache instead (e.g., for offline/isolated environments), pass `--local-cache` during setup:
 
-```json
-"CACHE_DIR": "/path/to/your/project/.mcp-local-rag-models"
+```bash
+~/backlog-setup/setup.sh --local-cache
 ```
+
+This stores the model in `TARGET_DIR/.mcp-local-rag-models` instead of the shared location.
 
 ## License
 

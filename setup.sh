@@ -18,20 +18,70 @@ set -euo pipefail
 # ─────────────────────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TARGET_DIR="${1:-$(pwd)}"
-TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 
-# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 info()  { echo -e "${BLUE}[info]${NC} $*"; }
 ok()    { echo -e "${GREEN}[ok]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[warn]${NC} $*"; }
 fail()  { echo -e "${RED}[error]${NC} $*"; exit 1; }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Argument parsing
+# ─────────────────────────────────────────────────────────────────────────────
+
+LOCAL_CACHE=false
+TARGET_DIR=""
+
+usage() {
+  cat <<EOF
+Usage: setup.sh [OPTIONS] [TARGET_DIR]
+
+Sets up an AI kanban board with semantic search in TARGET_DIR (default: current directory).
+
+Options:
+  --local-cache   Use a per-repo model cache instead of the shared cache at
+                  ~/.mcp-local-rag-models. The model (~90MB) will be stored
+                  in TARGET_DIR/.mcp-local-rag-models.
+  --help          Show this help message and exit.
+EOF
+  exit 0
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --local-cache)
+      LOCAL_CACHE=true
+      shift
+      ;;
+    --help|-h)
+      usage
+      ;;
+    -*)
+      fail "Unknown option: $1 (see --help)"
+      ;;
+    *)
+      TARGET_DIR="$1"
+      shift
+      ;;
+  esac
+done
+
+TARGET_DIR="${TARGET_DIR:-$(pwd)}"
+TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
+
+SHARED_CACHE="$HOME/.mcp-local-rag-models"
+LOCAL_CACHE_DIR="$TARGET_DIR/.mcp-local-rag-models"
+
+if [ "$LOCAL_CACHE" = true ]; then
+  CACHE_DIR_VALUE="$LOCAL_CACHE_DIR"
+else
+  CACHE_DIR_VALUE="$SHARED_CACHE"
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Pre-flight checks
@@ -154,7 +204,7 @@ else
       "env": {
         "BASE_DIR": "$TARGET_DIR/backlog",
         "DB_PATH": "$TARGET_DIR/.lancedb",
-        "CACHE_DIR": "$HOME/.mcp-local-rag-models"
+        "CACHE_DIR": "$CACHE_DIR_VALUE"
       }
     }
   }
@@ -185,7 +235,7 @@ else
       "environment": {
         "BASE_DIR": "$TARGET_DIR/backlog",
         "DB_PATH": "$TARGET_DIR/.lancedb",
-        "CACHE_DIR": "$HOME/.mcp-local-rag-models"
+        "CACHE_DIR": "$CACHE_DIR_VALUE"
       },
       "enabled": true
     }
@@ -229,34 +279,49 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Migrate per-repo model cache to shared cache (if applicable)
+# ─────────────────────────────────────────────────────────────────────────────
+
+if [ "$LOCAL_CACHE" = false ] && [ -d "$LOCAL_CACHE_DIR/Xenova" ]; then
+  if [ ! -d "$SHARED_CACHE/Xenova" ]; then
+    info "Moving per-repo model cache to shared location ($SHARED_CACHE)..."
+    mkdir -p "$SHARED_CACHE"
+    mv "$LOCAL_CACHE_DIR"/* "$SHARED_CACHE"/ 2>/dev/null || true
+    rmdir "$LOCAL_CACHE_DIR" 2>/dev/null || true
+    ok "Model cache migrated to $SHARED_CACHE (saved ~90MB in this repo)"
+  else
+    info "Removing redundant per-repo model cache (shared cache already exists)..."
+    rm -rf "$LOCAL_CACHE_DIR"
+    ok "Per-repo cache removed (shared cache at $SHARED_CACHE)"
+  fi
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Pre-download embedding model (so first MCP startup is fast)
 # ─────────────────────────────────────────────────────────────────────────────
 
-SHARED_CACHE="$HOME/.mcp-local-rag-models"
-
-if [ -d "$SHARED_CACHE/Xenova" ]; then
-  ok "Embedding model already cached ($SHARED_CACHE)"
+if [ -d "$CACHE_DIR_VALUE/Xenova" ]; then
+  ok "Embedding model already cached ($CACHE_DIR_VALUE)"
 else
-  info "Pre-downloading embedding model (~90MB, one-time) to $SHARED_CACHE..."
+  info "Pre-downloading embedding model (~90MB, one-time) to $CACHE_DIR_VALUE..."
   BASE_DIR="$TARGET_DIR/backlog" \
   DB_PATH="$TARGET_DIR/.lancedb" \
-  CACHE_DIR="$SHARED_CACHE" \
+  CACHE_DIR="$CACHE_DIR_VALUE" \
   node -e "
     import('mcp-local-rag/dist/server/index.js').then(async ({ RAGServer }) => {
       const s = new RAGServer({
         dbPath: '$TARGET_DIR/.lancedb',
         modelName: 'Xenova/all-MiniLM-L6-v2',
-        cacheDir: '$SHARED_CACHE',
+        cacheDir: '$CACHE_DIR_VALUE',
         baseDir: '$TARGET_DIR/backlog',
         maxFileSize: 104857600,
       });
       await s.initialize();
-      // Trigger model download by ingesting nothing — just warm the cache
       console.log('Model cache ready');
       process.exit(0);
     }).catch(e => { console.error(e.message); process.exit(0); });
   " 2>/dev/null || warn "Model pre-download skipped (will download on first use)"
-  ok "Embedding model cached at $SHARED_CACHE"
+  ok "Embedding model cached at $CACHE_DIR_VALUE"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────

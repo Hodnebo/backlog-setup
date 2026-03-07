@@ -1,7 +1,7 @@
 ---
 id: TASK-2
 title: Add --local-cache flag to opt out of shared model cache
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-07 20:33'
 labels:

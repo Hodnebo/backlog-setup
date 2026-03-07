@@ -1,7 +1,7 @@
 ---
 id: TASK-4
 title: Update README to document shared model cache behavior
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-07 20:34'
 labels:

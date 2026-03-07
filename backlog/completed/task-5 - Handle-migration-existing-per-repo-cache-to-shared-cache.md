@@ -1,7 +1,7 @@
 ---
 id: TASK-5
 title: 'Handle migration: existing per-repo cache to shared cache'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-07 20:34'
 labels:
