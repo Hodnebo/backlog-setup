@@ -122,7 +122,7 @@ RAG_SERVER_SRC="$SCRIPT_DIR/rag-server.mjs"
 if [ ! -f "$RAG_SERVER_SRC" ]; then
   # If running from curl pipe, download it
   RAG_SERVER_SRC="/tmp/backlog-setup-rag-server.mjs"
-  REPO_RAW="https://raw.githubusercontent.com/YOUR_USER/backlog-setup/main"
+  REPO_RAW="https://raw.githubusercontent.com/Hodnebo/backlog-setup/main"
   curl -fsSL "$REPO_RAW/rag-server.mjs" -o "$RAG_SERVER_SRC" 2>/dev/null || \
     fail "Could not download rag-server.mjs. Run setup from the cloned repo instead."
 fi

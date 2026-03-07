@@ -20,7 +20,7 @@ Combines [Backlog.md](https://github.com/MrLesk/Backlog.md) (markdown kanban + M
 
 ```bash
 # Clone this repo (or download setup.sh + rag-server.mjs)
-git clone https://github.com/YOUR_USER/backlog-setup.git ~/backlog-setup
+git clone https://github.com/Hodnebo/backlog-setup.git ~/backlog-setup
 
 # Run in your target project
 cd /path/to/your/project
