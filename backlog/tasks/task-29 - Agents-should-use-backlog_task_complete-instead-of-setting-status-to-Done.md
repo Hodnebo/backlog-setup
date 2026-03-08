@@ -4,7 +4,7 @@ title: Agents should use backlog_task_complete instead of setting status to Done
 status: In Progress
 assignee: []
 created_date: '2026-03-08 16:57'
-updated_date: '2026-03-08 17:31'
+updated_date: '2026-03-08 18:24'
 labels:
   - dx
   - backlog-workflow
@@ -22,8 +22,8 @@ This is a systemic issue: the AGENTS.md instructions, skill definitions, or work
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Workflow guidance (AGENTS.md, skills, or backlog guides) explicitly instructs agents to call backlog_task_complete for finished tasks
-- [ ] #2 Agents no longer set status to Done manually as the final step — they use backlog_task_complete instead
+- [x] #1 Workflow guidance (AGENTS.md, skills, or backlog guides) explicitly instructs agents to call backlog_task_complete for finished tasks
+- [x] #2 Agents no longer set status to Done manually as the final step — they use backlog_task_complete instead
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -90,3 +90,25 @@ Created two test files with 21 tests total:
 
 Existing tests (69) still pass. Ready for GREEN phase (Phases 1-3 implementation).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+## Summary
+
+Agents now use `backlog_task_complete` instead of `backlog_task_edit(status: Done)` when finishing tasks. This is enforced at three levels:
+
+### New files
+- **`lib/workflow-guides.mjs`** — Exports 4 corrected workflow guide text constants. Each mirrors the upstream Backlog.md guide content but replaces all "set status to Done via task_edit" instructions with `backlog_task_complete`.
+- **`lib/backlog-proxy.mjs`** — MCP proxy server that intercepts the 4 workflow guide tools (`backlog_get_workflow_overview`, `backlog_get_task_creation_guide`, `backlog_get_task_execution_guide`, `backlog_get_task_finalization_guide`) and returns corrected text without calling the upstream server. All other tools are forwarded transparently. Exports `getGuideOverride()`, `GUIDE_TOOL_NAMES`, and `createToolHandler()` for testability.
+- **`test/guidance.test.mjs`** — 9 policy tests ensuring setup.sh template, skill file, and workflow-guides.mjs all mention `backlog_task_complete` and don't instruct `backlog_task_edit` for completion.
+- **`test/backlog-proxy.test.mjs`** — 12 unit tests covering module exports, guide override lookup, content quality, and tool dispatching (interception + forwarding with mock client).
+
+### Changed files
+- **`setup.sh`** — AGENTS.md template line changed from `Mark the task "Done" with backlog_task_edit` to `Use backlog_task_complete`. MCP config templates (.mcp.json + opencode.json) now use `node lib/backlog-proxy.mjs` instead of `backlog mcp start`. `LIB_FILES` updated to include the two new modules.
+- **`AGENTS.md`** — Project structure updated with new lib/ and test/ files.
+- **`README.md`** — Architecture diagram updated to show proxy, file listing updated, Backlog MCP description updated.
+
+### Tests
+90 tests pass (21 new + 69 existing), 0 failures. Shell syntax validates cleanly.
+<!-- SECTION:FINAL_SUMMARY:END -->
