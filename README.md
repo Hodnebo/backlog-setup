@@ -47,11 +47,12 @@ That's it. Open the project in OpenCode, Claude Code, or Cursor — both MCP ser
 2. Installs `backlog.md` globally (if not already present)
 3. Runs `backlog init` with MCP integration mode
 4. Installs `mcp-local-rag` as a local dependency
-5. Copies `rag-server.mjs` (auto-ingest wrapper)
-6. Writes `.mcp.json` (Claude Code / Cursor) and `opencode.json` (OpenCode)
-7. Updates `.gitignore` to exclude vector DB, model cache, and node_modules
-8. Migrates any existing per-repo model cache to the shared location (or removes it if shared cache already exists)
-9. Pre-downloads the embedding model (~90MB) to `~/.mcp-local-rag-models` (shared across repos, one-time)
+5. Copies `rag-server.mjs` (auto-ingest wrapper with backlog-named MCP tools)
+6. Installs the `backlog-semantic-search` skill to `.opencode/skills/`
+7. Writes `.mcp.json` (Claude Code / Cursor) and `opencode.json` (OpenCode)
+8. Updates `.gitignore` to exclude vector DB, model cache, and node_modules
+9. Migrates any existing per-repo model cache to the shared location (or removes it if shared cache already exists)
+10. Pre-downloads the embedding model (~90MB) to `~/.mcp-local-rag-models` (shared across repos, one-time)
 
 Re-running is safe — it skips steps that are already done and migrates old per-repo caches automatically.
 
@@ -63,6 +64,7 @@ your-project/
   rag-server.mjs        # Auto-ingest MCP wrapper — commit this
   .mcp.json             # MCP config for Claude Code / Cursor
   opencode.json         # MCP config for OpenCode
+  .opencode/skills/     # AI agent skills (installed by setup.sh)
   .lancedb/             # Vector database (gitignored)
   node_modules/         # mcp-local-rag dependency (gitignored)
 
@@ -85,14 +87,26 @@ backlog task view TASK-1         # View a specific task
 
 **Backlog MCP** (22 tools): `task_create`, `task_edit`, `task_search`, `task_list`, `task_view`, `task_delete`, `task_move`, and more.
 
-**Local-RAG MCP** (6 tools): `query_documents` (semantic search), `ingest_file`, `ingest_data`, `delete_file`, `list_files`, `status`.
+**Backlog RAG MCP** (6 tools): `backlog_semantic_search` (vector similarity search), `backlog_rag_ingest_file`, `backlog_rag_ingest_data`, `backlog_rag_delete`, `backlog_rag_list`, `backlog_rag_status`.
+
+### Semantic search vs keyword search
+
+Your AI editor has two ways to search tasks:
+
+| | `backlog_semantic_search` | `backlog_task_search` |
+|---|---|---|
+| **Engine** | Vector embeddings (LanceDB) | Fuzzy keyword (Fuse.js) |
+| **Best for** | Conceptual queries, synonyms, natural language | Exact IDs, titles, labels, known keywords |
+| **Example** | "tasks about performance" | "TASK-42", "authentication" |
+
+The installed `backlog-semantic-search` skill teaches AI agents when to use each tool automatically.
 
 ### Example AI prompts
 
-- "Search for tasks related to authentication" — uses `query_documents` for semantic match
+- "Search for tasks related to authentication" — uses `backlog_semantic_search` for semantic match
 - "Create a task for adding rate limiting to the API" — uses `task_create`
 - "Move TASK-5 to Done" — uses `task_edit` to change status
-- "Find tasks similar to this bug report" — uses `query_documents` with natural language
+- "Find tasks similar to this bug report" — uses `backlog_semantic_search` with natural language
 
 ## How auto-ingestion works
 
@@ -103,7 +117,7 @@ backlog task view TASK-1         # View a specific task
 3. **Preprocesses backlog tasks** — strips YAML noise, HTML markers, and assembles clean embedding-friendly text
 4. Ingests only new or changed files into LanceDB
 5. Removes deleted files from the vector index
-6. Starts the real MCP server over stdio
+6. Starts a custom MCP server with backlog-named tools (`backlog_semantic_search`, etc.) over stdio
 
 Cold start (model loading): ~15s. Warm start (no changes): instant. One new file: ~5s.
 
@@ -131,7 +145,7 @@ Tested with 110 tasks across 10 domains (auth, database, API, frontend, DevOps, 
 | Average recall | **80.0%** |
 | Average response size | ~956 tokens per query |
 
-Each `query_documents` call returns relevant results in ~956 tokens — well within context-friendly bounds for AI editors.
+Each `backlog_semantic_search` call returns relevant results in ~956 tokens — well within context-friendly bounds for AI editors.
 
 ## Architecture
 
@@ -141,9 +155,9 @@ AI Editor (OpenCode / Claude Code / Cursor)
   ├─► backlog MCP server (stdio)
   │     └─► backlog/ directory (markdown task files)
   │
-  └─► rag-server.mjs (stdio)
+  └─► backlog-rag MCP server — rag-server.mjs (stdio)
         ├─► auto-ingest on startup
-        └─► mcp-local-rag MCP server
+        └─► backlog_semantic_search + 5 admin tools
               └─► .lancedb/ (LanceDB vector store)
 ```
 

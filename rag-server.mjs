@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 
 /**
- * Auto-ingest wrapper for mcp-local-rag.
+ * Backlog RAG server — semantic search over backlog tasks.
  *
  * On every startup:
- *   1. Scans BASE_DIR for supported files (.md, .txt, .pdf, .docx)
- *   2. Compares content hashes against a local cache
- *   3. Ingests new or changed files into LanceDB
- *   4. Removes deleted files from the index
- *   5. Starts the real MCP server over stdio
+ *   1. Creates a shared RAGServer instance (embedding model loaded once)
+ *   2. Scans BASE_DIR for supported files (.md, .txt, .pdf, .docx)
+ *   3. Compares content hashes against a local cache
+ *   4. Ingests new or changed files into LanceDB
+ *   5. Removes deleted files from the index
+ *   6. Starts a custom MCP server exposing backlog-named tools over stdio
  *
  * Drop-in replacement for `npx mcp-local-rag` in your MCP client config.
- * Same env vars, same behavior, plus auto-ingest on startup.
+ * Same env vars, same behavior, plus auto-ingest and backlog-specific tool names.
  *
  * Required env vars (set by MCP client config):
  *   BASE_DIR  — root directory to scan for files
@@ -24,10 +25,13 @@
  */
 
 import { RAGServer } from "mcp-local-rag/dist/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
 import { readdir, readFile } from "node:fs/promises";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { join, resolve, extname, basename } from "node:path";
+import { join, resolve, extname } from "node:path";
 import { homedir } from "node:os";
 
 const BASE_DIR = process.env.BASE_DIR || process.cwd();
@@ -39,6 +43,20 @@ const MIN_CHUNK_LENGTH = 50;
 
 const HASH_CACHE_PATH = join(DB_PATH, ".ingest-hashes.json");
 const SUPPORTED_EXTENSIONS = new Set([".md", ".txt", ".pdf", ".docx"]);
+
+// ---------------------------------------------------------------------------
+// Shared RAGServer instance — created once, used by both auto-ingest and MCP
+// ---------------------------------------------------------------------------
+
+const ragServer = new RAGServer({
+  dbPath: DB_PATH,
+  modelName: MODEL_NAME,
+  cacheDir: CACHE_DIR,
+  baseDir: BASE_DIR,
+  maxFileSize: MAX_FILE_SIZE,
+});
+
+await ragServer.initialize();
 
 // ---------------------------------------------------------------------------
 // Backlog task pre-processing
@@ -132,7 +150,11 @@ function preprocessBacklogTask(content) {
   return text;
 }
 
-const log = (msg) => process.stderr.write(`[auto-ingest] ${msg}\n`);
+// ---------------------------------------------------------------------------
+// File scanning and hashing
+// ---------------------------------------------------------------------------
+
+const log = (msg) => process.stderr.write(`[backlog-rag] ${msg}\n`);
 
 async function findFiles(dir) {
   const results = [];
@@ -175,17 +197,11 @@ function saveHashCache(cache) {
   writeFileSync(HASH_CACHE_PATH, JSON.stringify(cache, null, 2));
 }
 
+// ---------------------------------------------------------------------------
+// Auto-ingest — runs before MCP server starts
+// ---------------------------------------------------------------------------
+
 async function autoIngest() {
-  const server = new RAGServer({
-    dbPath: DB_PATH,
-    modelName: MODEL_NAME,
-    cacheDir: CACHE_DIR,
-    baseDir: BASE_DIR,
-    maxFileSize: MAX_FILE_SIZE,
-  });
-
-  await server.initialize();
-
   const files = await findFiles(BASE_DIR);
   const hashes = loadHashCache();
   const currentPaths = new Set(files.map((f) => resolve(f)));
@@ -211,7 +227,7 @@ async function autoIngest() {
         const cleanText = preprocessBacklogTask(rawContent);
         if (cleanText) {
           const source = `backlog://${absPath}`;
-          await server.handleIngestData({
+          await ragServer.handleIngestData({
             content: cleanText,
             metadata: { source, format: "text" },
           });
@@ -223,7 +239,7 @@ async function autoIngest() {
         // Fall through to raw ingest if preprocessing returned null
       }
 
-      await server.handleIngestFile({ filePath: absPath });
+      await ragServer.handleIngestFile({ filePath: absPath });
       hashes[absPath] = hash;
       ingested++;
       log(`ingested: ${absPath}`);
@@ -239,11 +255,11 @@ async function autoIngest() {
       try {
         // Try both deletion methods: source-based (backlog tasks) and filePath-based (raw files)
         try {
-          await server.handleDeleteFile({ source: `backlog://${cachedPath}` });
+          await ragServer.handleDeleteFile({ source: `backlog://${cachedPath}` });
         } catch {
           // Not a backlog task or already gone — try filePath-based
         }
-        await server.handleDeleteFile({ filePath: cachedPath });
+        await ragServer.handleDeleteFile({ filePath: cachedPath });
       } catch {
         // file might not be in the vector DB — that's fine
       }
@@ -264,7 +280,116 @@ async function autoIngest() {
   }
 }
 
-// --- Main ---
+// ---------------------------------------------------------------------------
+// Custom MCP server — backlog-named tools wrapping RAGServer handlers
+// ---------------------------------------------------------------------------
+
+function createMcpServer() {
+  const server = new McpServer({
+    name: "backlog-rag",
+    version: "1.0.0",
+  });
+
+  // -- Primary search tool --------------------------------------------------
+
+  server.tool(
+    "backlog_semantic_search",
+    "Semantic search over backlog tasks and project documents; " +
+    "finds results by meaning, synonyms, and conceptual similarity; " +
+    "use for natural-language queries like 'authentication issues' or 'performance improvements'; " +
+    "complements backlog_task_search (keyword/fuzzy) with deeper conceptual matching; " +
+    "returns matched text with source and relevance score (0 = best)",
+    {
+      query: z.string().describe(
+        "Natural language search query; be specific and include context"
+      ),
+      limit: z.number().int().min(1).max(50).optional().describe(
+        "Max results to return (default: 10); use 5 for precision, 20 for broad exploration"
+      ),
+    },
+    async ({ query, limit }) => {
+      const args = { query };
+      if (limit !== undefined) args.limit = limit;
+      return await ragServer.handleQueryDocuments(args);
+    }
+  );
+
+  // -- Admin tools (auto-ingest handles most of this, but expose for manual use)
+
+  server.tool(
+    "backlog_rag_ingest_file",
+    "Manually ingest a file into the backlog semantic search index; " +
+    "auto-ingest handles this on startup so manual use is rarely needed; " +
+    "supports PDF, DOCX, TXT, MD",
+    {
+      filePath: z.string().describe("Absolute path to the file to ingest"),
+    },
+    async ({ filePath }) => {
+      return await ragServer.handleIngestFile({ filePath });
+    }
+  );
+
+  server.tool(
+    "backlog_rag_ingest_data",
+    "Ingest text content into the backlog semantic search index; " +
+    "use for web pages, clipboard text, or markdown strings; " +
+    "the source identifier enables re-ingestion to update existing content",
+    {
+      content: z.string().describe("The content to ingest (text, HTML, or Markdown)"),
+      metadata: z.object({
+        source: z.string().describe(
+          "Source identifier; use URL for web pages or scheme://date format"
+        ),
+        format: z.enum(["text", "html", "markdown"]).describe("Content format"),
+      }),
+    },
+    async ({ content, metadata }) => {
+      return await ragServer.handleIngestData({ content, metadata });
+    }
+  );
+
+  server.tool(
+    "backlog_rag_delete",
+    "Remove a file or data source from the backlog semantic search index; " +
+    "use filePath for files or source for data ingested via ingest_data",
+    {
+      filePath: z.string().optional().describe("Absolute path to the file to remove"),
+      source: z.string().optional().describe("Source identifier used during ingest_data"),
+    },
+    async ({ filePath, source }) => {
+      const args = {};
+      if (filePath) args.filePath = filePath;
+      if (source) args.source = source;
+      return await ragServer.handleDeleteFile(args);
+    }
+  );
+
+  server.tool(
+    "backlog_rag_list",
+    "List all files and data sources in the backlog semantic search index; " +
+    "shows which files are ingested and their status",
+    {},
+    async () => {
+      return await ragServer.handleListFiles();
+    }
+  );
+
+  server.tool(
+    "backlog_rag_status",
+    "Get backlog semantic search system status; " +
+    "shows total documents, chunks, database size, and configuration",
+    {},
+    async () => {
+      return await ragServer.handleStatus();
+    }
+  );
+
+  return server;
+}
+
+// ---------------------------------------------------------------------------
+// Main — auto-ingest then start MCP server
+// ---------------------------------------------------------------------------
 
 try {
   await autoIngest();
@@ -273,6 +398,7 @@ try {
   // Don't block MCP server startup on ingest failure
 }
 
-// Start the real MCP server — hands off stdio
-const { startServer } = await import("mcp-local-rag/dist/server-main.js");
-await startServer();
+const mcpServer = createMcpServer();
+const transport = new StdioServerTransport();
+await mcpServer.connect(transport);
+log("backlog-rag MCP server started");

@@ -181,6 +181,21 @@ cp "$RAG_SERVER_SRC" "$TARGET_DIR/rag-server.mjs"
 ok "rag-server.mjs installed"
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Install backlog semantic search skill (OpenCode)
+# ─────────────────────────────────────────────────────────────────────────────
+
+SKILL_SRC="$SCRIPT_DIR/skills/backlog-semantic-search.md"
+SKILL_DEST="$TARGET_DIR/.opencode/skills/backlog-semantic-search.md"
+
+if [ -f "$SKILL_SRC" ]; then
+  mkdir -p "$TARGET_DIR/.opencode/skills"
+  cp "$SKILL_SRC" "$SKILL_DEST"
+  ok "Backlog semantic search skill installed (.opencode/skills/)"
+else
+  warn "Skill file not found at $SKILL_SRC — skipping skill install"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Write MCP configs
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -198,7 +213,7 @@ else
         "BACKLOG_CWD": "$TARGET_DIR"
       }
     },
-    "local-rag": {
+    "backlog-rag": {
       "command": "node",
       "args": ["$TARGET_DIR/rag-server.mjs"],
       "env": {
@@ -229,7 +244,7 @@ else
       },
       "enabled": true
     },
-    "local-rag": {
+    "backlog-rag": {
       "type": "local",
       "command": ["node", "$TARGET_DIR/rag-server.mjs"],
       "environment": {
@@ -276,6 +291,40 @@ if [ -f ".gitignore" ]; then
 else
   printf '%s\n' "${GITIGNORE_ENTRIES[@]}" > .gitignore
   ok ".gitignore created"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Append backlog workflow to AGENTS.md
+# ─────────────────────────────────────────────────────────────────────────────
+
+AGENTS_MARKER="## Backlog Workflow"
+
+if [ -f "AGENTS.md" ] && grep -qF "$AGENTS_MARKER" AGENTS.md; then
+  ok "AGENTS.md already has backlog workflow section"
+else
+  cat >> AGENTS.md <<'AGENTSEOF'
+
+## Backlog Workflow
+
+Before starting any work:
+
+1. Run `backlog_task_list` to see current tasks and their statuses
+2. Check if the work you are about to do is already tracked as a task
+
+While working:
+
+- If no task exists for your work, create one with `backlog_task_create` and set status to "In Progress"
+- If a task exists, move it to "In Progress" with `backlog_task_edit`
+- Break large efforts into subtasks
+
+After completing work:
+
+- Mark the task "Done" with `backlog_task_edit`
+- Fill in the `finalSummary` with what changed and why
+
+Use `backlog_semantic_search` for natural-language task discovery ("what needs performance work?") and `backlog_task_search` for exact lookups ("TASK-12", "authentication").
+AGENTSEOF
+  ok "AGENTS.md updated with backlog workflow"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -345,8 +394,11 @@ echo "    backlog browser            — open web UI (localhost:6420)"
 echo "    backlog task create \"Do X\" — create a task"
 echo ""
 echo "  MCP servers (auto-start in your AI editor):"
-echo "    backlog   — 22 tools for task management"
-echo "    local-rag — semantic search (auto-ingests on startup)"
+echo "    backlog     — 22 tools for task management"
+echo "    backlog-rag — semantic search (auto-ingests on startup)"
+echo ""
+echo "  Installed skill:"
+echo "    .opencode/skills/backlog-semantic-search.md"
 echo ""
 echo "  The RAG index syncs automatically every time your AI"
 echo "  editor opens this repo. No manual steps needed."
