@@ -10,6 +10,7 @@
  *   4. Ingests new or changed files into LanceDB
  *   5. Removes deleted files from the index
  *   6. Starts a custom MCP server exposing backlog-named tools over stdio
+ *   7. Starts a recursive file watcher on BASE_DIR for live vector DB sync
  *
  * Drop-in replacement for `npx mcp-local-rag` in your MCP client config.
  * Same env vars, same behavior, plus auto-ingest and backlog-specific tool names.
@@ -28,8 +29,8 @@ import { RAGServer } from "mcp-local-rag/dist/server/index.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { readdir, readFile } from "node:fs/promises";
-import { writeFileSync, readFileSync, existsSync } from "node:fs";
+import { readdir, readFile, stat } from "node:fs/promises";
+import { writeFileSync, readFileSync, existsSync, watch } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, resolve, extname } from "node:path";
 import { homedir } from "node:os";
@@ -40,6 +41,7 @@ const CACHE_DIR = process.env.CACHE_DIR || join(homedir(), ".mcp-local-rag-model
 const MODEL_NAME = process.env.MODEL_NAME || "Xenova/all-MiniLM-L6-v2";
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "104857600", 10);
 const MIN_CHUNK_LENGTH = 50;
+const WATCH_DEBOUNCE_MS = 300;
 
 const HASH_CACHE_PATH = join(DB_PATH, ".ingest-hashes.json");
 const SUPPORTED_EXTENSIONS = new Set([".md", ".txt", ".pdf", ".docx"]);
@@ -198,12 +200,74 @@ function saveHashCache(cache) {
 }
 
 // ---------------------------------------------------------------------------
+// Shared hash cache — module-level so both autoIngest and watcher can use it
+// ---------------------------------------------------------------------------
+
+let hashes = loadHashCache();
+
+// ---------------------------------------------------------------------------
+// Single-file ingest / remove — reused by autoIngest and file watcher
+// ---------------------------------------------------------------------------
+
+/**
+ * Ingest or re-ingest a single file. Returns true if the file was ingested
+ * (new or changed), false if unchanged. Throws on error.
+ */
+async function ingestFile(absPath) {
+  const hash = await hashFile(absPath);
+  if (hashes[absPath] === hash) return false;
+
+  // Check if this is a backlog task .md file — pre-process for better embeddings
+  const rawContent = await readFile(absPath, "utf-8");
+  if (extname(absPath).toLowerCase() === ".md" && isBacklogTask(rawContent)) {
+    const cleanText = preprocessBacklogTask(rawContent);
+    if (cleanText) {
+      const source = `backlog://${absPath}`;
+      await ragServer.handleIngestData({
+        content: cleanText,
+        metadata: { source, format: "text" },
+      });
+      hashes[absPath] = hash;
+      saveHashCache(hashes);
+      log(`ingested (preprocessed): ${absPath} (${cleanText.length} chars)`);
+      return true;
+    }
+    // Fall through to raw ingest if preprocessing returned null
+  }
+
+  await ragServer.handleIngestFile({ filePath: absPath });
+  hashes[absPath] = hash;
+  saveHashCache(hashes);
+  log(`ingested: ${absPath}`);
+  return true;
+}
+
+/**
+ * Remove a single file from the vector index and hash cache.
+ */
+async function removeFile(absPath) {
+  // Try both deletion methods: source-based (backlog tasks) and filePath-based (raw files)
+  try {
+    await ragServer.handleDeleteFile({ source: `backlog://${absPath}` });
+  } catch {
+    // Not a backlog task or already gone — try filePath-based
+  }
+  try {
+    await ragServer.handleDeleteFile({ filePath: absPath });
+  } catch {
+    // file might not be in the vector DB — that's fine
+  }
+  delete hashes[absPath];
+  saveHashCache(hashes);
+  log(`deleted from index: ${absPath}`);
+}
+
+// ---------------------------------------------------------------------------
 // Auto-ingest — runs before MCP server starts
 // ---------------------------------------------------------------------------
 
 async function autoIngest() {
   const files = await findFiles(BASE_DIR);
-  const hashes = loadHashCache();
   const currentPaths = new Set(files.map((f) => resolve(f)));
 
   let ingested = 0;
@@ -215,34 +279,12 @@ async function autoIngest() {
   for (const filePath of files) {
     const absPath = resolve(filePath);
     try {
-      const hash = await hashFile(absPath);
-      if (hashes[absPath] === hash) {
+      const changed = await ingestFile(absPath);
+      if (changed) {
+        ingested++;
+      } else {
         skipped++;
-        continue;
       }
-
-      // Check if this is a backlog task .md file — pre-process for better embeddings
-      const rawContent = await readFile(absPath, "utf-8");
-      if (extname(absPath).toLowerCase() === ".md" && isBacklogTask(rawContent)) {
-        const cleanText = preprocessBacklogTask(rawContent);
-        if (cleanText) {
-          const source = `backlog://${absPath}`;
-          await ragServer.handleIngestData({
-            content: cleanText,
-            metadata: { source, format: "text" },
-          });
-          hashes[absPath] = hash;
-          ingested++;
-          log(`ingested (preprocessed): ${absPath} (${cleanText.length} chars)`);
-          continue;
-        }
-        // Fall through to raw ingest if preprocessing returned null
-      }
-
-      await ragServer.handleIngestFile({ filePath: absPath });
-      hashes[absPath] = hash;
-      ingested++;
-      log(`ingested: ${absPath}`);
     } catch (err) {
       errors++;
       log(`error ingesting ${absPath}: ${err.message}`);
@@ -253,23 +295,13 @@ async function autoIngest() {
   for (const cachedPath of Object.keys(hashes)) {
     if (!currentPaths.has(cachedPath)) {
       try {
-        // Try both deletion methods: source-based (backlog tasks) and filePath-based (raw files)
-        try {
-          await ragServer.handleDeleteFile({ source: `backlog://${cachedPath}` });
-        } catch {
-          // Not a backlog task or already gone — try filePath-based
-        }
-        await ragServer.handleDeleteFile({ filePath: cachedPath });
+        await removeFile(cachedPath);
       } catch {
-        // file might not be in the vector DB — that's fine
+        // removal failed — non-fatal
       }
-      delete hashes[cachedPath];
       deleted++;
-      log(`deleted from index: ${cachedPath}`);
     }
   }
-
-  saveHashCache(hashes);
 
   if (ingested > 0 || deleted > 0 || errors > 0) {
     log(
@@ -277,6 +309,75 @@ async function autoIngest() {
     );
   } else {
     log(`all ${skipped} files up to date`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// File watcher — live sync after startup
+// ---------------------------------------------------------------------------
+
+/**
+ * Start a recursive fs.watch on BASE_DIR. File changes are debounced per-path
+ * and then ingested or removed from the vector DB.
+ *
+ * The watcher is non-fatal: errors are logged but never crash the process.
+ * On platforms where recursive watching is unsupported, a warning is logged
+ * and the server falls back to startup-only sync.
+ */
+function startWatcher() {
+  const pending = new Map();
+
+  /** Handle a debounced file event. */
+  async function handleFileEvent(absPath) {
+    try {
+      // Check if file still exists (rename/delete events)
+      let exists = false;
+      try {
+        await stat(absPath);
+        exists = true;
+      } catch {
+        // stat failed — file was deleted or renamed away
+      }
+
+      if (exists) {
+        await ingestFile(absPath);
+      } else if (hashes[absPath]) {
+        await removeFile(absPath);
+      }
+    } catch (err) {
+      log(`watcher error for ${absPath}: ${err.message}`);
+    }
+  }
+
+  try {
+    const watcher = watch(BASE_DIR, { recursive: true });
+
+    watcher.on("change", (_eventType, filename) => {
+      if (!filename) return;
+
+      const absPath = resolve(join(BASE_DIR, filename));
+
+      // Only process supported file types
+      if (!SUPPORTED_EXTENSIONS.has(extname(absPath).toLowerCase())) return;
+
+      // Debounce: reset timer on every event for this path
+      if (pending.has(absPath)) clearTimeout(pending.get(absPath));
+      pending.set(
+        absPath,
+        setTimeout(() => {
+          pending.delete(absPath);
+          handleFileEvent(absPath);
+        }, WATCH_DEBOUNCE_MS)
+      );
+    });
+
+    watcher.on("error", (err) => {
+      log(`watcher error: ${err.message}`);
+    });
+
+    log("file watcher started on " + BASE_DIR);
+  } catch (err) {
+    log(`file watcher unavailable (non-fatal): ${err.message}`);
   }
 }
 
@@ -402,3 +503,5 @@ const mcpServer = createMcpServer();
 const transport = new StdioServerTransport();
 await mcpServer.connect(transport);
 log("backlog-rag MCP server started");
+
+startWatcher();

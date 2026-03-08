@@ -110,7 +110,7 @@ The installed `backlog-semantic-search` skill teaches AI agents when to use each
 
 ## How auto-ingestion works
 
-`rag-server.mjs` wraps `mcp-local-rag` and adds startup-time sync:
+`rag-server.mjs` wraps `mcp-local-rag` and adds startup-time sync plus live file watching:
 
 1. Scans `backlog/` recursively for `.md`, `.txt`, `.pdf`, `.docx` files
 2. Computes SHA-256 content hashes and compares against `.lancedb/.ingest-hashes.json`
@@ -118,8 +118,21 @@ The installed `backlog-semantic-search` skill teaches AI agents when to use each
 4. Ingests only new or changed files into LanceDB
 5. Removes deleted files from the vector index
 6. Starts a custom MCP server with backlog-named tools (`backlog_semantic_search`, etc.) over stdio
+7. **Starts a file watcher** on `BASE_DIR` — file changes are detected, debounced (300ms), and synced to the vector DB automatically
 
 Cold start (model loading): ~15s. Warm start (no changes): instant. One new file: ~5s.
+
+### Live file watching
+
+After startup, `rag-server.mjs` watches `BASE_DIR` for file changes using Node.js `fs.watch` with recursive mode. This means long editor sessions stay in sync without restarting the MCP server.
+
+- **New files** are ingested automatically
+- **Changed files** are re-ingested (hash-compared to skip unchanged content)
+- **Deleted files** are removed from the vector index
+- Events are **debounced per-file** (300ms) to handle rapid saves and editor atomic-write patterns
+- Watcher errors are logged but never crash the server — worst case, you fall back to startup-only sync
+
+**Platform support**: Recursive file watching works natively on **macOS** and **Windows**. On **Linux**, `fs.watch` recursive support is limited in some Node.js versions — if unavailable, the server logs a warning and continues with startup-only sync.
 
 ### Backlog task preprocessing
 
