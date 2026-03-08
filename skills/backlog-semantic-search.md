@@ -47,3 +47,12 @@ Semantic search finds results by meaning, synonyms, and conceptual similarity. K
 2. **Know exact task ID?** → `backlog_task_search` (only exception)
 3. **Need status/priority filter?** → `backlog_task_list` with filters
 4. **Semantic results insufficient?** → Then try `backlog_task_search` as a second pass
+
+## Completing Tasks
+
+**RULE: Use `backlog_task_complete` to finish tasks — NOT `backlog_task_edit(status="Done")`.**
+
+`backlog_task_complete` moves the task file to the `completed/` directory, which removes it from the semantic search index. Using `backlog_task_edit(status="Done")` only flips the status field but leaves the file indexed alongside active tasks, polluting search results.
+
+- **Correct**: `backlog_task_complete(id="TASK-42")` — file moves out of the index
+- **Wrong**: `backlog_task_edit(id="TASK-42", status="Done")` — file stays indexed

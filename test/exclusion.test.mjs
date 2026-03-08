@@ -236,6 +236,18 @@ describe("isExcluded", () => {
     assert.ok(isExcluded(".opencode/config.json", defaultMatchers));
   });
 
+  it("excludes completed directory", () => {
+    assert.ok(isExcluded("completed", defaultMatchers));
+    assert.ok(isExcluded("completed/task-1.md", defaultMatchers));
+    assert.ok(isExcluded("tasks/completed/task-1.md", defaultMatchers));
+  });
+
+  it("excludes archive directory", () => {
+    assert.ok(isExcluded("archive", defaultMatchers));
+    assert.ok(isExcluded("archive/task-1.md", defaultMatchers));
+    assert.ok(isExcluded("tasks/archive/task-1.md", defaultMatchers));
+  });
+
   it("does not exclude normal project files", () => {
     assert.ok(!isExcluded("src/index.js", defaultMatchers));
     assert.ok(!isExcluded("backlog/tasks/task-1.md", defaultMatchers));
@@ -273,9 +285,11 @@ describe("DEFAULT_EXCLUDE_PATTERNS", () => {
     assert.ok(DEFAULT_EXCLUDE_PATTERNS.includes(".mcp-local-rag-models"));
     assert.ok(DEFAULT_EXCLUDE_PATTERNS.includes(".DS_Store"));
     assert.ok(DEFAULT_EXCLUDE_PATTERNS.includes(".opencode"));
+    assert.ok(DEFAULT_EXCLUDE_PATTERNS.includes("completed"));
+    assert.ok(DEFAULT_EXCLUDE_PATTERNS.includes("archive"));
   });
 
-  it("has exactly 6 default patterns", () => {
-    assert.equal(DEFAULT_EXCLUDE_PATTERNS.length, 6);
+  it("has exactly 8 default patterns", () => {
+    assert.equal(DEFAULT_EXCLUDE_PATTERNS.length, 8);
   });
 });
