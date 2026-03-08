@@ -56,8 +56,7 @@ Options:
                               --submodule. If omitted with --submodule, a local
                               repo is created (add remote later).
   --update                    Refresh MCP configs and AGENTS.md workflow section
-                              from latest templates. Backs up existing configs
-                              as .bak before overwriting.
+                               from latest templates.
   --help                      Show this help message and exit.
 EOF
   exit 0
@@ -366,8 +365,7 @@ if [ -f ".mcp.json" ] && [ "$UPDATE_MODE" = false ]; then
   warn ".mcp.json already exists — skipping (use --update to refresh)"
 else
   if [ -f ".mcp.json" ]; then
-    cp ".mcp.json" ".mcp.json.bak"
-    info "Backed up .mcp.json → .mcp.json.bak"
+    info "Overwriting .mcp.json with latest template"
   fi
   cat > .mcp.json <<MCPJSON
 {
@@ -399,8 +397,7 @@ if [ -f "opencode.json" ] && [ "$UPDATE_MODE" = false ]; then
   warn "opencode.json already exists — skipping (use --update to refresh)"
 else
   if [ -f "opencode.json" ]; then
-    cp "opencode.json" "opencode.json.bak"
-    info "Backed up opencode.json → opencode.json.bak"
+    info "Overwriting opencode.json with latest template"
   fi
   cat > opencode.json <<OCJSON
 {
