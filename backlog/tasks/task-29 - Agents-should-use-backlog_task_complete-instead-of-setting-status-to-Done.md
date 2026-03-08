@@ -1,10 +1,10 @@
 ---
 id: TASK-29
 title: Agents should use backlog_task_complete instead of setting status to Done
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-03-08 16:57'
-updated_date: '2026-03-08 18:24'
+updated_date: '2026-03-08 18:25'
 labels:
   - dx
   - backlog-workflow
