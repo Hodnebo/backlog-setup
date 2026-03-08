@@ -1,9 +1,10 @@
 ---
 id: TASK-23
 title: Refactor project structure for better organization
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-08 13:36'
+updated_date: '2026-03-08 14:16'
 labels:
   - refactor
   - DX
@@ -60,14 +61,20 @@ test/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 rag-server.mjs is split into ≤6 focused modules in lib/
-- [ ] #2 Each extracted module has a single responsibility and exports named functions
-- [ ] #3 Test files moved to test/ directory with updated imports
-- [ ] #4 setup.sh copies the correct files to target projects (either lib/ dir or re-exported root entry)
-- [ ] #5 MCP configs (opencode.json, .mcp.json templates in setup.sh) reference correct entry point
-- [ ] #6 All existing tests pass with `node --test` after restructuring
-- [ ] #7 perf-test.mjs works from its new location
-- [ ] #8 AGENTS.md updated with new paths and module descriptions
-- [ ] #9 README.md architecture diagram and file listing updated
-- [ ] #10 No functionality changes — pure structural refactor
+- [x] #1 rag-server.mjs is split into ≤6 focused modules in lib/
+- [x] #2 Each extracted module has a single responsibility and exports named functions
+- [x] #3 Test files moved to test/ directory with updated imports
+- [x] #4 setup.sh copies the correct files to target projects (either lib/ dir or re-exported root entry)
+- [x] #5 MCP configs (opencode.json, .mcp.json templates in setup.sh) reference correct entry point
+- [x] #6 All existing tests pass with `node --test` after restructuring
+- [x] #7 perf-test.mjs works from its new location
+- [x] #8 AGENTS.md updated with new paths and module descriptions
+- [x] #9 README.md architecture diagram and file listing updated
+- [x] #10 No functionality changes — pure structural refactor
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Split 602-line monolithic `rag-server.mjs` into 6 focused modules under `lib/`: `preprocessing.mjs`, `exclusion.mjs`, `discovery.mjs`, `hashing.mjs`, `ingestion.mjs`, and a slim `rag-server.mjs` entry point. Moved 3 test files to `test/` with updated imports. Updated `setup.sh` to copy all lib files (including curl fallback), updated MCP config templates to reference `lib/rag-server.mjs`, and updated `AGENTS.md`, `README.md`, and `package.json` to reflect new structure. Deleted 5 old root-level files. All 65 tests pass, `bash -n setup.sh` validates clean. Commits: `53b1b05` (refactor), `6bf6c58` (backlog task).
+<!-- SECTION:FINAL_SUMMARY:END -->
