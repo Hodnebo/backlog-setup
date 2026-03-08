@@ -26,7 +26,11 @@ Without `--update`, behavior stays the same (skip existing configs). With `--upd
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Running setup.sh --update regenerates .mcp.json and opencode.json with current templates (backing up old files as .bak)
-- [ ] #2 Running setup.sh --update replaces the ## Backlog Workflow section in AGENTS.md with the latest template without touching other content
-- [ ] #3 Running setup.sh without --update preserves existing skip behavior (no regression)
+- [x] #1 Running setup.sh --update regenerates .mcp.json and opencode.json with current templates (backing up old files as .bak)
+- [x] #2 Running setup.sh --update replaces the ## Backlog Workflow section in AGENTS.md with the latest template without touching other content
+- [x] #3 Running setup.sh without --update preserves existing skip behavior (no regression)
 <!-- AC:END -->
+
+## Final Summary
+
+Implemented --update flag for setup.sh. In update mode, .mcp.json and opencode.json are backed up as .bak before overwriting with current templates. AGENTS.md uses `<!-- BACKLOG_WORKFLOW:BEGIN/END -->` HTML comment markers; --update removes the old section via sed and re-appends the latest template. Without --update, existing configs are skipped (no regression). Also removed the "Committing backlog changes" subsection from the AGENTS.md template since backlog-commit-hook.sh handles auto-commits. Updated README.md with --update docs.
