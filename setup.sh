@@ -287,7 +287,7 @@ fi
 
 LIB_SRC_DIR="$SCRIPT_DIR/lib"
 REPO_RAW="https://raw.githubusercontent.com/Hodnebo/backlog-setup/main"
-LIB_FILES="rag-server.mjs preprocessing.mjs exclusion.mjs discovery.mjs hashing.mjs ingestion.mjs"
+LIB_FILES="rag-server.mjs preprocessing.mjs exclusion.mjs discovery.mjs hashing.mjs ingestion.mjs workflow-guides.mjs backlog-proxy.mjs"
 
 if [ -d "$LIB_SRC_DIR" ]; then
   mkdir -p "$TARGET_DIR/lib"
@@ -349,8 +349,8 @@ else
 {
   "mcpServers": {
     "backlog": {
-      "command": "backlog",
-      "args": ["mcp", "start"],
+      "command": "node",
+      "args": ["$TARGET_DIR/lib/backlog-proxy.mjs"],
       "env": {
         "BACKLOG_CWD": "$TARGET_DIR"
       }
@@ -380,7 +380,7 @@ else
   "mcp": {
     "backlog": {
       "type": "local",
-      "command": ["backlog", "mcp", "start"],
+      "command": ["node", "$TARGET_DIR/lib/backlog-proxy.mjs"],
       "environment": {
         "BACKLOG_CWD": "$TARGET_DIR"
       },
@@ -464,7 +464,7 @@ While working:
 
 After completing work:
 
-- Mark the task "Done" with `backlog_task_edit`
+- Use `backlog_task_complete` to mark the task as complete (do NOT use `backlog_task_edit` to set status to Done)
 - Fill in the `finalSummary` with what changed and why
 
 Use `backlog_semantic_search` for natural-language task discovery ("what needs performance work?") and `backlog_task_search` for exact lookups ("TASK-12", "authentication").

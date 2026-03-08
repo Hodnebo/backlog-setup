@@ -91,13 +91,15 @@ Re-running is safe — it skips steps that are already done and migrates old per
 ```
 your-project/
   backlog/                  # Kanban data (tasks, docs, milestones) — commit this
-  lib/                      # Modular RAG server — commit this
+  lib/                      # Modular RAG server + backlog proxy — commit this
     rag-server.mjs          #   Entry point (env config, MCP server, file watcher)
     preprocessing.mjs       #   Backlog task detection and text preprocessing
     exclusion.mjs           #   Directory/file exclusion patterns
     discovery.mjs           #   File discovery (recursive scan)
     hashing.mjs             #   Content hashing (SHA-256 change detection)
     ingestion.mjs           #   File ingestion/removal with retry logic
+    workflow-guides.mjs     #   Corrected workflow guide text
+    backlog-proxy.mjs       #   MCP proxy (intercepts guide tools, forwards the rest)
   backlog-commit-hook.sh    # Auto-commit hook — commit this
   .mcp.json                 # MCP config for Claude Code / Cursor
   opencode.json             # MCP config for OpenCode
@@ -122,7 +124,7 @@ backlog task view TASK-1         # View a specific task
 
 ### MCP tools (via your AI editor)
 
-**Backlog MCP** (22 tools): `task_create`, `task_edit`, `task_search`, `task_list`, `task_view`, `task_delete`, `task_move`, and more.
+**Backlog MCP proxy** (22 tools): `task_create`, `task_edit`, `task_search`, `task_list`, `task_view`, `task_complete`, `task_archive`, and more. The proxy intercepts 4 workflow guide tools to return corrected guidance that instructs agents to use `backlog_task_complete` for finishing tasks.
 
 **Backlog RAG MCP** (6 tools): `backlog_semantic_search` (vector similarity search), `backlog_rag_ingest_file`, `backlog_rag_ingest_data`, `backlog_rag_delete`, `backlog_rag_list`, `backlog_rag_status`.
 
@@ -143,7 +145,7 @@ The installed `backlog-semantic-search` skill teaches AI agents to prefer semant
 
 - "Search for tasks related to authentication" — uses `backlog_semantic_search` for semantic match
 - "Create a task for adding rate limiting to the API" — uses `task_create`
-- "Move TASK-5 to Done" — uses `task_edit` to change status
+- "Complete TASK-5" — uses `task_complete` to finalize and move to completed folder
 - "Find tasks similar to this bug report" — uses `backlog_semantic_search` with natural language
 
 ## How it works behind the scenes
@@ -165,8 +167,10 @@ Tested with 110 tasks: 100% ingestion success, 80% recall, ~956 tokens per query
 ```
 AI Editor (OpenCode / Claude Code / Cursor)
   |
-  |-- backlog MCP server (stdio)
-  |     '-- backlog/ directory (markdown task files)
+  |-- backlog MCP proxy -- lib/backlog-proxy.mjs (stdio)
+  |     |-- intercepts 4 workflow guide tools (returns corrected text)
+  |     '-- forwards all other tools to upstream backlog MCP
+  |           '-- backlog/ directory (markdown task files)
   |
   '-- backlog-rag MCP server -- lib/rag-server.mjs (stdio)
         |-- auto-ingest on startup

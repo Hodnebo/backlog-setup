@@ -1,6 +1,6 @@
 # AGENTS.md — backlog-setup
 
-Setup/tooling repo (not an application). Three source areas: `setup.sh` (bash installer), `lib/` (Node.js ESM modular MCP server wrapping mcp-local-rag), and `skills/` (installable AI agent skills). No build step, no linter, no tests, no CI.
+Setup/tooling repo (not an application). Three source areas: `setup.sh` (bash installer), `lib/` (Node.js ESM modules — RAG server wrapping mcp-local-rag, plus MCP proxy for backlog with corrected workflow guides), and `skills/` (installable AI agent skills). No build step, no linter, no CI.
 
 ## Commands
 
@@ -23,9 +23,13 @@ lib/
   discovery.mjs           # File discovery (recursive scan with extension filtering)
   hashing.mjs             # Content hashing (SHA-256 change detection)
   ingestion.mjs           # File ingestion/removal with retry logic
+  workflow-guides.mjs     # Corrected workflow guide text (backlog_task_complete)
+  backlog-proxy.mjs       # MCP proxy — intercepts guide tools, forwards the rest
 test/
   preprocessing.test.mjs  # Tests for preprocessing module
   exclusion.test.mjs      # Tests for exclusion module
+  guidance.test.mjs       # Policy tests for workflow guidance text
+  backlog-proxy.test.mjs  # Tests for MCP proxy module
   perf-test.mjs           # Precision/recall benchmark (50 tasks, 10 queries)
 skills/
   backlog-semantic-search.md  # Installed into target projects
