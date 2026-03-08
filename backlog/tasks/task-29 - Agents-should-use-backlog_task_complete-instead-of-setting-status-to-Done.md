@@ -4,7 +4,7 @@ title: Agents should use backlog_task_complete instead of setting status to Done
 status: In Progress
 assignee: []
 created_date: '2026-03-08 16:57'
-updated_date: '2026-03-08 17:26'
+updated_date: '2026-03-08 17:31'
 labels:
   - dx
   - backlog-workflow
@@ -64,3 +64,29 @@ This is a systemic issue: the AGENTS.md instructions, skill definitions, or work
    - Non-intercepted tools are forwarded (mock client)
    - Guide override lookup logic works correctly
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Phase 4 — TDD RED phase complete (2026-03-08)
+
+Created two test files with 21 tests total:
+
+### test/guidance.test.mjs (9 tests, 3 pass / 6 fail)
+- **setup.sh AGENTS.md template** (3 tests, 1 pass / 2 fail)
+  - ✅ Template found in setup.sh
+  - ❌ Template doesn't mention `backlog_task_complete` (line 467 still says `backlog_task_edit`)
+  - ❌ Template still instructs `Mark the task "Done" with backlog_task_edit`
+- **skills/backlog-semantic-search.md** (2 tests, 2 pass) — already fixed
+- **lib/workflow-guides.mjs** (4 tests, 0 pass) — file doesn't exist yet (Phase 1)
+
+### test/backlog-proxy.test.mjs (12 tests, 0 pass / 12 fail)
+- All fail with ERR_MODULE_NOT_FOUND — file doesn't exist yet (Phase 2)
+- Tests define the expected API:
+  - `getGuideOverride(toolName)` → string | null
+  - `GUIDE_TOOL_NAMES` → array of 4 tool names
+  - `createToolHandler(client)` → handler function
+  - Handler intercepts 4 guide tools, forwards all others to client
+
+Existing tests (69) still pass. Ready for GREEN phase (Phases 1-3 implementation).
+<!-- SECTION:NOTES:END -->
