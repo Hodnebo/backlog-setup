@@ -30,6 +30,42 @@ ok()    { echo -e "${GREEN}[ok]${NC} $*"; }
 warn()  { echo -e "${YELLOW}[warn]${NC} $*"; }
 fail()  { echo -e "${RED}[error]${NC} $*"; exit 1; }
 
+REPLY_CHOICE=""
+
+ask_yn() {
+  local prompt="$1" default="${2:-y}"
+  if [ "$INTERACTIVE" = false ]; then
+    [[ "$default" = "y" ]]
+    return
+  fi
+  local yn
+  if [ "$default" = "y" ]; then
+    read -rp "  $prompt [Y/n]: " yn
+    [[ -z "$yn" || "$yn" =~ ^[Yy] ]]
+  else
+    read -rp "  $prompt [y/N]: " yn
+    [[ "$yn" =~ ^[Yy] ]]
+  fi
+}
+
+ask_choice() {
+  local prompt="$1" default="$2"
+  shift 2
+  local options=("$@")
+  if [ "$INTERACTIVE" = false ]; then
+    REPLY_CHOICE="$default"
+    return
+  fi
+  echo ""
+  echo -e "  ${BLUE}${prompt}${NC}"
+  for i in "${!options[@]}"; do
+    echo "    $((i + 1))) ${options[$i]}"
+  done
+  local choice
+  read -rp "  Choice [$default]: " choice
+  REPLY_CHOICE="${choice:-$default}"
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Argument parsing
 # ─────────────────────────────────────────────────────────────────────────────
@@ -38,7 +74,14 @@ LOCAL_CACHE=false
 SUBMODULE_MODE=false
 BACKLOG_REMOTE=""
 UPDATE_MODE=false
+INTERACTIVE=true
+AUTO_COMMIT=true
+EDITOR_CONFIG="all"
 TARGET_DIR=""
+
+# Track which options were explicitly set via CLI flags
+FLAG_LOCAL_CACHE=false
+FLAG_SUBMODULE=false
 
 usage() {
   cat <<EOF
@@ -57,6 +100,9 @@ Options:
                               repo is created (add remote later).
   --update                    Refresh MCP configs and AGENTS.md workflow section
                                from latest templates.
+  --yes, -y                   Skip interactive prompts and use defaults.
+                              Also activates automatically when stdin is not a terminal
+                              (e.g. curl | bash).
   --help                      Show this help message and exit.
 EOF
   exit 0
@@ -66,10 +112,16 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --local-cache)
       LOCAL_CACHE=true
+      FLAG_LOCAL_CACHE=true
       shift
       ;;
     --submodule)
       SUBMODULE_MODE=true
+      FLAG_SUBMODULE=true
+      shift
+      ;;
+    --yes|-y)
+      INTERACTIVE=false
       shift
       ;;
     --backlog-remote)
@@ -104,6 +156,11 @@ fi
 
 if [ "$SUBMODULE_MODE" = true ]; then
   info "Submodule mode enabled"
+fi
+
+# Fall back to non-interactive when stdin is not a terminal (e.g. curl | bash)
+if [ "$INTERACTIVE" = true ] && [ ! -t 0 ]; then
+  INTERACTIVE=false
 fi
 
 TARGET_DIR="${TARGET_DIR:-$(pwd)}"
@@ -156,6 +213,101 @@ fi
 ok "backlog.md $(backlog --version 2>/dev/null || echo 'installed')"
 
 echo ""
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Configuration wizard (interactive mode)
+# ─────────────────────────────────────────────────────────────────────────────
+
+if [ "$INTERACTIVE" = true ]; then
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE} Configuration${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+  if [ "$FLAG_LOCAL_CACHE" = false ]; then
+    ask_choice "Model cache location:" "1" \
+      "Shared (~/.mcp-local-rag-models) — one download, shared across repos" \
+      "Per-repo (.mcp-local-rag-models/) — isolated, uses more disk"
+    case "$REPLY_CHOICE" in
+      2) LOCAL_CACHE=true ;;
+    esac
+  fi
+
+  if [ "$FLAG_SUBMODULE" = false ]; then
+    ask_choice "Backlog storage mode:" "1" \
+      "Plain directory — tracked in project git" \
+      "Git submodule — separate repo for task history"
+    case "$REPLY_CHOICE" in
+      2) SUBMODULE_MODE=true ;;
+    esac
+  fi
+
+  if [ "$SUBMODULE_MODE" = true ] && [ -z "$BACKLOG_REMOTE" ]; then
+    echo ""
+    echo -e "  ${BLUE}Backlog remote URL (leave empty for local-only):${NC}"
+    read -rp "  URL: " BACKLOG_REMOTE
+  fi
+
+  if ask_yn "Auto-commit task changes?" "y"; then
+    AUTO_COMMIT=true
+  else
+    AUTO_COMMIT=false
+  fi
+
+  ask_choice "Editor configs to generate:" "1" \
+    "All — OpenCode + Claude Code / Cursor" \
+    "OpenCode only" \
+    "Claude Code / Cursor only (.mcp.json)"
+  case "$REPLY_CHOICE" in
+    2) EDITOR_CONFIG="opencode" ;;
+    3) EDITOR_CONFIG="claude" ;;
+    *) EDITOR_CONFIG="all" ;;
+  esac
+
+  echo ""
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE} Summary${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+  echo "  Target:      $TARGET_DIR"
+  if [ "$LOCAL_CACHE" = true ]; then
+    echo "  Cache:       Per-repo (.mcp-local-rag-models/)"
+  else
+    echo "  Cache:       Shared (~/.mcp-local-rag-models)"
+  fi
+  if [ "$SUBMODULE_MODE" = true ]; then
+    if [ -n "$BACKLOG_REMOTE" ]; then
+      echo "  Storage:     Git submodule ($BACKLOG_REMOTE)"
+    else
+      echo "  Storage:     Git submodule (local)"
+    fi
+  else
+    echo "  Storage:     Plain directory"
+  fi
+  if [ "$AUTO_COMMIT" = true ]; then
+    echo "  Auto-commit: Enabled"
+  else
+    echo "  Auto-commit: Disabled"
+  fi
+  case "$EDITOR_CONFIG" in
+    all)      echo "  Editors:     All (OpenCode + Claude Code / Cursor)" ;;
+    opencode) echo "  Editors:     OpenCode only" ;;
+    claude)   echo "  Editors:     Claude Code / Cursor only" ;;
+  esac
+  echo ""
+
+  if ! ask_yn "Proceed?" "y"; then
+    echo "Aborted."
+    exit 0
+  fi
+  echo ""
+fi
+
+# Recompute cache dir (wizard may have changed LOCAL_CACHE)
+if [ "$LOCAL_CACHE" = true ]; then
+  CACHE_DIR_VALUE="$LOCAL_CACHE_DIR"
+else
+  CACHE_DIR_VALUE="$SHARED_CACHE"
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Initialize backlog (if not already)
@@ -346,6 +498,7 @@ fi
 SKILL_SRC="$SCRIPT_DIR/skills/backlog-semantic-search.md"
 SKILL_DEST="$TARGET_DIR/.opencode/skills/backlog-semantic-search.md"
 
+if [ "$EDITOR_CONFIG" = "all" ] || [ "$EDITOR_CONFIG" = "opencode" ]; then
 if [ "$SELF_INSTALL" = true ]; then
   ok "Skill already in place (self-install)"
 elif [ -f "$SKILL_SRC" ]; then
@@ -355,12 +508,23 @@ elif [ -f "$SKILL_SRC" ]; then
 else
   warn "Skill file not found at $SKILL_SRC — skipping skill install"
 fi
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Write MCP configs
 # ─────────────────────────────────────────────────────────────────────────────
 
+MCP_RAG_ENV_EXTRA=""
+OC_RAG_ENV_EXTRA=""
+if [ "$AUTO_COMMIT" = false ]; then
+  MCP_RAG_ENV_EXTRA=',
+      "BACKLOG_AUTO_COMMIT": "false"'
+  OC_RAG_ENV_EXTRA=',
+      "BACKLOG_AUTO_COMMIT": "false"'
+fi
+
 # .mcp.json (Claude Code / Cursor)
+if [ "$EDITOR_CONFIG" = "all" ] || [ "$EDITOR_CONFIG" = "claude" ]; then
 if [ -f ".mcp.json" ] && [ "$UPDATE_MODE" = false ]; then
   warn ".mcp.json already exists — skipping (use --update to refresh)"
 else
@@ -379,7 +543,7 @@ else
     "env": {
       "BASE_DIR": "$TARGET_DIR/backlog",
       "DB_PATH": "$TARGET_DIR/.lancedb",
-      "CACHE_DIR": "$CACHE_DIR_VALUE"
+      "CACHE_DIR": "$CACHE_DIR_VALUE"$MCP_RAG_ENV_EXTRA
     }
   }
 }
@@ -403,8 +567,10 @@ MCPJSON
   fi
   ok ".mcp.json created (Claude Code / Cursor)"
 fi
+fi
 
 # opencode.json (OpenCode)
+if [ "$EDITOR_CONFIG" = "all" ] || [ "$EDITOR_CONFIG" = "opencode" ]; then
 if [ -f "opencode.json" ] && [ "$UPDATE_MODE" = false ]; then
   warn "opencode.json already exists — skipping (use --update to refresh)"
 else
@@ -424,7 +590,7 @@ else
     "environment": {
       "BASE_DIR": "$TARGET_DIR/backlog",
       "DB_PATH": "$TARGET_DIR/.lancedb",
-      "CACHE_DIR": "$CACHE_DIR_VALUE"
+      "CACHE_DIR": "$CACHE_DIR_VALUE"$OC_RAG_ENV_EXTRA
     },
     "enabled": true
   }
@@ -449,6 +615,7 @@ OCFRAG
 OCJSON
   fi
   ok "opencode.json created (OpenCode)"
+fi
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -593,8 +760,12 @@ echo "  Files created:"
 echo "    backlog/                 — kanban board data (tasks, docs, milestones)"
 echo "    lib/                     — modular RAG server (6 modules)"
 echo "    backlog-commit-hook.sh   — auto-commit after task operations"
+if [ "$EDITOR_CONFIG" = "all" ] || [ "$EDITOR_CONFIG" = "claude" ]; then
 echo "    .mcp.json                — MCP config for Claude Code / Cursor"
+fi
+if [ "$EDITOR_CONFIG" = "all" ] || [ "$EDITOR_CONFIG" = "opencode" ]; then
 echo "    opencode.json            — MCP config for OpenCode"
+fi
 if [ "$SUBMODULE_MODE" = true ]; then
 echo ""
 echo "  Submodule mode:"
@@ -610,13 +781,20 @@ echo ""
 echo "  MCP servers (auto-start in your AI editor):"
 echo "    backlog     — 22 tools for task management"
 echo "    backlog-rag — semantic search (auto-ingests on startup)"
+if [ "$EDITOR_CONFIG" = "all" ] || [ "$EDITOR_CONFIG" = "opencode" ]; then
 echo ""
 echo "  Installed skill:"
 echo "    .opencode/skills/backlog-semantic-search.md"
+fi
 echo ""
 echo "  The RAG index syncs automatically every time your AI"
 echo "  editor opens this repo. No manual steps needed."
 echo ""
+if [ "$AUTO_COMMIT" = true ]; then
 echo "  Auto-commit: task changes are committed automatically."
 echo "  Disable with: BACKLOG_AUTO_COMMIT=false"
+else
+echo "  Auto-commit: disabled."
+echo "  Enable with: BACKLOG_AUTO_COMMIT=true in your MCP config env"
+fi
 echo ""
