@@ -1,10 +1,10 @@
 ---
 id: TASK-28
 title: Exclude completed/archived tasks from semantic search
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-03-08 15:42'
-updated_date: '2026-03-08 16:19'
+updated_date: '2026-03-08 16:22'
 labels:
   - rag-server
   - skill
