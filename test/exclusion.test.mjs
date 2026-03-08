@@ -153,11 +153,20 @@ describe("globToRegex — anchored patterns (leading /)", () => {
     const re = globToRegex("/vendor");
     assert.ok(re.test("vendor"));
     assert.ok(re.test("vendor/lib/foo"));
-    // Note: bare-name anchoring does not prevent matching nested paths
-    // because the bare-name branch in globToRegex returns before checking
-    // the anchored flag. This is a known limitation — anchoring only
-    // takes effect when the pattern contains slashes or glob characters.
-    assert.ok(re.test("sub/vendor"));
+  });
+
+  it("anchored bare name does NOT match nested paths", () => {
+    const re = globToRegex("/vendor");
+    assert.ok(!re.test("sub/vendor"), "Anchored /vendor should not match sub/vendor");
+    assert.ok(!re.test("a/b/vendor"), "Anchored /vendor should not match a/b/vendor");
+    assert.ok(!re.test("a/b/vendor/lib"), "Anchored /vendor should not match a/b/vendor/lib");
+  });
+
+  it("anchored bare name with trailing slash works", () => {
+    const re = globToRegex("/dist/");
+    assert.ok(re.test("dist"));
+    assert.ok(re.test("dist/bundle.js"));
+    assert.ok(!re.test("sub/dist"));
   });
 
   it("anchored glob matches from start", () => {
