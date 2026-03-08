@@ -1,9 +1,10 @@
 ---
 id: TASK-28
 title: Exclude completed/archived tasks from semantic search
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-03-08 15:42'
+updated_date: '2026-03-08 16:19'
 labels:
   - rag-server
   - skill
@@ -30,10 +31,10 @@ Two changes needed:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Files in `backlog/completed/` and `backlog/archive/` are not ingested during auto-ingest
-- [ ] #2 File watcher ignores changes in `completed/` and `archive/` directories
-- [ ] #3 Already-indexed completed/archived files are purged from the vector DB on startup
-- [ ] #4 The `backlog-semantic-search` skill instructs agents to use `backlog_task_complete` for finishing tasks
-- [ ] #5 Existing tests still pass
-- [ ] #6 No new dependencies added
+- [x] #1 Files in `backlog/completed/` and `backlog/archive/` are not ingested during auto-ingest
+- [x] #2 File watcher ignores changes in `completed/` and `archive/` directories
+- [x] #3 Already-indexed completed/archived files are purged from the vector DB on startup
+- [x] #4 The `backlog-semantic-search` skill instructs agents to use `backlog_task_complete` for finishing tasks
+- [x] #5 Existing tests still pass
+- [x] #6 No new dependencies added
 <!-- AC:END -->
