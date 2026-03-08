@@ -158,6 +158,35 @@ function preprocessBacklogTask(content) {
 
 const log = (msg) => process.stderr.write(`[backlog-rag] ${msg}\n`);
 
+const MAX_RETRIES = 2;
+const RETRY_BASE_MS = 500;
+
+/**
+ * Retry an async operation with exponential backoff.
+ * Logs each retry attempt to stderr. Returns the result on success or throws
+ * the last error after all retries are exhausted.
+ *
+ * @param {() => Promise<T>} fn    — async function to retry
+ * @param {string}           label — human-readable label for log messages
+ * @returns {Promise<T>}
+ */
+async function withRetry(fn, label) {
+  let lastErr;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (attempt < MAX_RETRIES) {
+        const delayMs = RETRY_BASE_MS * 2 ** attempt;
+        log(`retry ${attempt + 1}/${MAX_RETRIES} for ${label}: ${err.message} (backoff ${delayMs}ms)`);
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 async function findFiles(dir) {
   const results = [];
   try {
@@ -274,12 +303,13 @@ async function autoIngest() {
   let skipped = 0;
   let deleted = 0;
   let errors = 0;
+  const failedFiles = [];
 
   // Ingest new or changed files
   for (const filePath of files) {
     const absPath = resolve(filePath);
     try {
-      const changed = await ingestFile(absPath);
+      const changed = await withRetry(() => ingestFile(absPath), absPath);
       if (changed) {
         ingested++;
       } else {
@@ -287,7 +317,8 @@ async function autoIngest() {
       }
     } catch (err) {
       errors++;
-      log(`error ingesting ${absPath}: ${err.message}`);
+      failedFiles.push(absPath);
+      log(`permanently failed to ingest ${absPath}: ${err.message}`);
     }
   }
 
@@ -295,9 +326,9 @@ async function autoIngest() {
   for (const cachedPath of Object.keys(hashes)) {
     if (!currentPaths.has(cachedPath)) {
       try {
-        await removeFile(cachedPath);
-      } catch {
-        // removal failed — non-fatal
+        await withRetry(() => removeFile(cachedPath), cachedPath);
+      } catch (err) {
+        log(`permanently failed to remove ${cachedPath}: ${err.message}`);
       }
       deleted++;
     }
@@ -309,6 +340,10 @@ async function autoIngest() {
     );
   } else {
     log(`all ${skipped} files up to date`);
+  }
+
+  if (failedFiles.length > 0) {
+    log(`permanently failed files (${failedFiles.length}): ${failedFiles.join(", ")}`);
   }
 }
 
@@ -340,12 +375,12 @@ function startWatcher() {
       }
 
       if (exists) {
-        await ingestFile(absPath);
+        await withRetry(() => ingestFile(absPath), absPath);
       } else if (hashes[absPath]) {
-        await removeFile(absPath);
+        await withRetry(() => removeFile(absPath), absPath);
       }
     } catch (err) {
-      log(`watcher error for ${absPath}: ${err.message}`);
+      log(`watcher permanently failed for ${absPath}: ${err.message}`);
     }
   }
 
