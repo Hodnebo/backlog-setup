@@ -11,3 +11,6 @@ opencode.json
 
 # Node
 node_modules/
+
+# IDE
+.idea/
