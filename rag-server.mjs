@@ -35,105 +35,28 @@ import { writeFileSync, readFileSync, existsSync, watch } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, resolve, relative, extname } from "node:path";
 import { homedir } from "node:os";
+import {
+  DEFAULT_EXCLUDE_PATTERNS,
+  MIN_CHUNK_LENGTH,
+  globToRegex,
+  isExcluded as isExcludedByMatchers,
+  isBacklogTask,
+  preprocessBacklogTask,
+} from "./rag-utils.mjs";
 
 const BASE_DIR = process.env.BASE_DIR || process.cwd();
 const DB_PATH = process.env.DB_PATH || join(BASE_DIR, ".lancedb");
 const CACHE_DIR = process.env.CACHE_DIR || join(homedir(), ".mcp-local-rag-models");
 const MODEL_NAME = process.env.MODEL_NAME || "Xenova/all-MiniLM-L6-v2";
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "104857600", 10);
-const MIN_CHUNK_LENGTH = 50;
 const WATCH_DEBOUNCE_MS = 300;
 
 const HASH_CACHE_PATH = join(DB_PATH, ".ingest-hashes.json");
 const SUPPORTED_EXTENSIONS = new Set([".md", ".txt", ".pdf", ".docx"]);
 
 // ---------------------------------------------------------------------------
-// Directory / file exclusion patterns
+// Directory / file exclusion patterns (loaded from rag-utils.mjs)
 // ---------------------------------------------------------------------------
-
-const DEFAULT_EXCLUDE_PATTERNS = [
-  ".git",
-  "node_modules",
-  ".lancedb",
-  ".mcp-local-rag-models",
-  ".DS_Store",
-  ".opencode",
-];
-
-/**
- * Convert a gitignore-style glob pattern to a RegExp.
- *
- * Supported syntax:
- *   - `*`    matches any characters except path separators
- *   - `**`   matches any characters including path separators (directory wildcard)
- *   - `?`    matches a single non-separator character
- *   - Bare names like `node_modules` match as a path segment anywhere
- *   - Patterns starting with `/` are anchored to BASE_DIR root
- *   - Trailing `/` forces directory-only matching (stripped before conversion)
- *
- * @param {string} pattern — gitignore-style glob
- * @returns {RegExp}
- */
-function globToRegex(pattern) {
-  let anchored = false;
-  let p = pattern;
-
-  // Leading `/` anchors to the root of the scanned tree
-  if (p.startsWith("/")) {
-    anchored = true;
-    p = p.slice(1);
-  }
-
-  // Trailing `/` means directory-only — semantically we just strip it
-  // because we check directories by name before recursing
-  if (p.endsWith("/")) {
-    p = p.slice(0, -1);
-  }
-
-  // If the pattern has no slashes and no glob chars, it's a bare name —
-  // match it as a path segment anywhere: (^|/)name($|/)
-  const hasSlash = p.includes("/");
-  const hasGlob = /[*?]/.test(p);
-
-  if (!hasSlash && !hasGlob) {
-    // Bare name — match as exact segment anywhere in the path
-    return new RegExp("(^|/)" + escapeRegex(p) + "($|/)");
-  }
-
-  // Convert glob to regex
-  let regex = "";
-  let i = 0;
-  while (i < p.length) {
-    if (p[i] === "*" && p[i + 1] === "*") {
-      // `**` — match everything (including separators)
-      regex += ".*";
-      i += 2;
-      // Skip a following `/` (e.g., `**/foo` → match foo at any depth)
-      if (p[i] === "/") i++;
-    } else if (p[i] === "*") {
-      // `*` — match non-separator chars
-      regex += "[^/]*";
-      i++;
-    } else if (p[i] === "?") {
-      regex += "[^/]";
-      i++;
-    } else {
-      regex += escapeRegex(p[i]);
-      i++;
-    }
-  }
-
-  if (anchored || hasSlash) {
-    // Anchored or path-containing patterns match from the start of the relative path
-    return new RegExp("^" + regex + "($|/)");
-  }
-  // Unanchored glob patterns match anywhere
-  return new RegExp("(^|/)" + regex + "($|/)");
-}
-
-function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 /**
  * Load exclusion patterns from:
@@ -184,10 +107,7 @@ const EXCLUDE_MATCHERS = loadExcludePatterns();
  * @returns {boolean}
  */
 function isExcluded(relativePath) {
-  for (const re of EXCLUDE_MATCHERS) {
-    if (re.test(relativePath)) return true;
-  }
-  return false;
+  return isExcludedByMatchers(relativePath, EXCLUDE_MATCHERS);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,96 +125,8 @@ const ragServer = new RAGServer({
 await ragServer.initialize();
 
 // ---------------------------------------------------------------------------
-// Backlog task pre-processing
+// Backlog task pre-processing — imported from rag-utils.mjs
 // ---------------------------------------------------------------------------
-
-/**
- * Detect whether a file is a backlog task (YAML frontmatter with id/title/status).
- */
-function isBacklogTask(content) {
-  return /^---\n[\s\S]*?\n---/.test(content) && /^id:\s/m.test(content) && /^title:\s/m.test(content);
-}
-
-/**
- * Parse a backlog .md task file into clean, embedding-friendly text.
- *
- * Strips YAML frontmatter noise (dates, ordinals, empty arrays) and HTML
- * section markers, then builds: "title; labels: x, y; priority: z; <description>"
- *
- * If the result is shorter than MIN_CHUNK_LENGTH, the title is repeated to pad it.
- */
-function preprocessBacklogTask(content) {
-  // --- Extract frontmatter fields ---
-  const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
-  if (!fmMatch) return null;
-
-  const fm = fmMatch[1];
-  const get = (key) => {
-    const m = fm.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
-    return m ? m[1].replace(/^['"]|['"]$/g, "").trim() : null;
-  };
-
-  const title = get("title");
-  if (!title) return null;
-
-  const priority = get("priority");
-
-  // Labels can be YAML list (indented "- foo") or inline
-  const labels = [];
-  const labelsBlock = fm.match(/^labels:\n((?:\s+-\s+.+\n?)*)/m);
-  if (labelsBlock) {
-    for (const lm of labelsBlock[1].matchAll(/^\s+-\s+(.+)$/gm)) {
-      labels.push(lm[1].trim());
-    }
-  }
-
-  // --- Extract description (between section markers or after frontmatter) ---
-  const body = content.slice(fmMatch[0].length);
-  let description = "";
-  const sectionMatch = body.match(
-    /<!--\s*SECTION:DESCRIPTION:BEGIN\s*-->([\s\S]*?)<!--\s*SECTION:DESCRIPTION:END\s*-->/
-  );
-  if (sectionMatch) {
-    description = sectionMatch[1].trim();
-  } else {
-    // Fallback: strip markdown headings and take whatever text remains
-    description = body
-      .replace(/^##?\s+.*/gm, "")
-      .replace(/<!--[\s\S]*?-->/g, "")
-      .trim();
-  }
-
-  // --- Assemble clean text ---
-  // IMPORTANT: Use semicolons (not periods) as separators. The mcp-local-rag
-  // SemanticChunker uses Intl.Segmenter which splits on periods, creating many
-  // tiny sentences that individually fall below the 50-char minChunkLength
-  // threshold and get filtered out — resulting in 0 chunks.
-  // Semicolons keep everything as one "sentence" for the chunker.
-  const parts = [title];
-  if (labels.length > 0) parts.push(`labels: ${labels.join(", ")}`);
-  if (priority) parts.push(`priority: ${priority}`);
-  if (description) {
-    // Replace sentence-ending periods with semicolons to prevent over-splitting
-    const flatDesc = description
-      .replace(/\n+/g, "; ")       // newlines → semicolons
-      .replace(/\.\s+/g, "; ")     // "foo. bar" → "foo; bar"
-      .replace(/\.\s*$/, "");       // trailing period
-    parts.push(flatDesc);
-  }
-
-  let text = parts.join("; ");
-
-  // --- Pad short texts to meet the 50-char minimum chunk threshold ---
-  if (text.length < MIN_CHUNK_LENGTH) {
-    // Repeat context until we clear the threshold (no periods — avoid segmenter splitting)
-    const pad = `${title}, ${labels.join(", ")} ${priority || ""}`.trim();
-    while (text.length < MIN_CHUNK_LENGTH) {
-      text += "; " + pad;
-    }
-  }
-
-  return text;
-}
 
 // ---------------------------------------------------------------------------
 // File scanning and hashing
