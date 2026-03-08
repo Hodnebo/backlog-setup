@@ -32,9 +32,11 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { writeFileSync, readFileSync, existsSync, watch } from "node:fs";
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { join, resolve, relative, extname } from "node:path";
+import { join, resolve, relative, extname, basename, dirname } from "node:path";
 import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 import {
   DEFAULT_EXCLUDE_PATTERNS,
   MIN_CHUNK_LENGTH,
@@ -50,6 +52,7 @@ const CACHE_DIR = process.env.CACHE_DIR || join(homedir(), ".mcp-local-rag-model
 const MODEL_NAME = process.env.MODEL_NAME || "Xenova/all-MiniLM-L6-v2";
 const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "104857600", 10);
 const WATCH_DEBOUNCE_MS = 300;
+const COMMIT_DEBOUNCE_MS = 2000;
 
 const HASH_CACHE_PATH = join(DB_PATH, ".ingest-hashes.json");
 const SUPPORTED_EXTENSIONS = new Set([".md", ".txt", ".pdf", ".docx"]);
@@ -273,6 +276,75 @@ async function removeFile(absPath) {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-commit hook — batches file changes into a single git commit
+// ---------------------------------------------------------------------------
+
+const HOOK_SCRIPT = join(dirname(fileURLToPath(import.meta.url)), "backlog-commit-hook.sh");
+const AUTO_COMMIT_ENABLED = (process.env.BACKLOG_AUTO_COMMIT || "true") !== "false";
+
+function buildOperationDescription(changedFiles, deletedFiles) {
+  const ids = [];
+
+  for (const f of [...changedFiles, ...deletedFiles]) {
+    const name = basename(f, ".md");
+    const match = name.match(/^task-(\d+)/i);
+    if (match) ids.push(`TASK-${match[1]}`);
+  }
+
+  if (changedFiles.size === 0 && deletedFiles.size > 0) {
+    return ids.length > 0
+      ? `remove ${ids.join(", ")}`
+      : `remove ${deletedFiles.size} file(s)`;
+  }
+  if (ids.length === 1) {
+    return `update ${ids[0]}`;
+  }
+  if (ids.length > 1) {
+    return `update ${ids.join(", ")}`;
+  }
+  return `update ${changedFiles.size + deletedFiles.size} file(s)`;
+}
+
+let commitTimer = null;
+const pendingChangedFiles = new Set();
+const pendingDeletedFiles = new Set();
+
+function scheduleCommit(absPath, deleted) {
+  if (!AUTO_COMMIT_ENABLED) return;
+  if (!existsSync(HOOK_SCRIPT)) return;
+
+  if (deleted) {
+    pendingDeletedFiles.add(absPath);
+    pendingChangedFiles.delete(absPath);
+  } else {
+    pendingChangedFiles.add(absPath);
+    pendingDeletedFiles.delete(absPath);
+  }
+
+  if (commitTimer) clearTimeout(commitTimer);
+  commitTimer = setTimeout(() => {
+    commitTimer = null;
+    const changed = new Set(pendingChangedFiles);
+    const removed = new Set(pendingDeletedFiles);
+    pendingChangedFiles.clear();
+    pendingDeletedFiles.clear();
+
+    const operation = buildOperationDescription(changed, removed);
+    execFile(HOOK_SCRIPT, [operation], {
+      env: { ...process.env, BACKLOG_DIR: BASE_DIR },
+      timeout: 30000,
+    }, (err, _stdout, stderr) => {
+      if (err) {
+        log(`commit hook error: ${err.message}`);
+      }
+      if (stderr) {
+        process.stderr.write(stderr);
+      }
+    });
+  }, COMMIT_DEBOUNCE_MS);
+}
+
+// ---------------------------------------------------------------------------
 // Auto-ingest — runs before MCP server starts
 // ---------------------------------------------------------------------------
 
@@ -357,8 +429,10 @@ function startWatcher() {
 
       if (exists) {
         await withRetry(() => ingestFile(absPath), absPath);
+        scheduleCommit(absPath, false);
       } else if (hashes[absPath]) {
         await withRetry(() => removeFile(absPath), absPath);
+        scheduleCommit(absPath, true);
       }
     } catch (err) {
       log(`watcher permanently failed for ${absPath}: ${err.message}`);

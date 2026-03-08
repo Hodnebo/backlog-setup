@@ -9,6 +9,7 @@ Combines [Backlog.md](https://github.com/MrLesk/Backlog.md) (markdown kanban + M
 - **Kanban board** stored as markdown files in `backlog/` — works with CLI, web UI, and 22 MCP tools
 - **Semantic search** over all tasks via local embeddings (Xenova/all-MiniLM-L6-v2) — no API keys, fully offline
 - **Auto-ingestion** — every time your AI editor opens the repo, new/changed tasks are indexed automatically
+- **Auto-commit** — task file changes are committed automatically (with git mode detection and batching)
 - **MCP configs** for OpenCode, Claude Code, and Cursor — zero manual wiring
 
 ## Requirements
@@ -41,18 +42,85 @@ To use a per-repo model cache instead of the shared one:
 
 That's it. Open the project in OpenCode, Claude Code, or Cursor — both MCP servers start automatically.
 
+## Submodule mode (optional)
+
+By default, `backlog/` is a plain directory tracked by your project's git. For teams or multi-agent workflows where frequent task commits create noise in the main repo, you can isolate backlog history in a separate git repository wired as a submodule.
+
+### Setup
+
+**With an existing remote repo for backlog:**
+
+```bash
+~/backlog-setup/setup.sh --submodule --backlog-remote git@github.com:org/project-backlog.git /path/to/project
+```
+
+**Without a remote (local-only, add remote later):**
+
+```bash
+~/backlog-setup/setup.sh --submodule /path/to/project
+```
+
+This creates a local bare repo at `.backlog-repo.git` as the submodule source. To add a real remote later:
+
+```bash
+cd backlog
+git remote set-url origin git@github.com:org/project-backlog.git
+git push -u origin main
+```
+
+**Converting an existing plain backlog/ to submodule:**
+
+If you already ran setup without `--submodule` and want to convert, just re-run with the flag:
+
+```bash
+~/backlog-setup/setup.sh --submodule --backlog-remote <url> /path/to/project
+```
+
+The script detects the existing `backlog/` directory, converts it to a submodule, and preserves all task files.
+
+**Cloning a project that uses submodule mode:**
+
+```bash
+git clone --recursive <project-url>
+# or if already cloned:
+git submodule update --init
+```
+
+`setup.sh --submodule` also handles this automatically — if `.gitmodules` references backlog but it isn't initialized, it runs `git submodule update --init`.
+
+### How it works
+
+- Task files live in `backlog/` exactly as before — all MCP tools, semantic search, and skills work identically
+- `backlog/` is a git submodule pointing to a separate repository
+- Task commits (creates, edits, status changes) happen inside the submodule repo
+- The parent project only tracks a submodule pointer, not individual task files
+- The parent pointer updates only when you explicitly commit it (e.g. at milestone boundaries)
+
+### Tradeoffs
+
+| | Plain directory (default) | Submodule mode |
+|---|---|---|
+| **Setup** | Zero config | Requires `--submodule` flag |
+| **Commit workflow** | `git add backlog/ && git commit` | `cd backlog && git add -A && git commit && git push` |
+| **Project history** | Task changes mixed with code changes | Task changes isolated in separate repo |
+| **Merge conflicts** | Possible on task files during rebases | Isolated to backlog repo |
+| **Best for** | Solo developers, small teams | Teams, multi-agent workflows, noisy backlogs |
+
 ## What setup.sh does
 
 1. Checks Node.js 18+ and npm are available
 2. Installs `backlog.md` globally (if not already present)
 3. Runs `backlog init` with MCP integration mode
-4. Installs `mcp-local-rag` as a local dependency
-5. Copies `rag-server.mjs` (auto-ingest wrapper with backlog-named MCP tools)
-6. Installs the `backlog-semantic-search` skill to `.opencode/skills/`
-7. Writes `.mcp.json` (Claude Code / Cursor) and `opencode.json` (OpenCode)
-8. Updates `.gitignore` to exclude vector DB, model cache, and node_modules
-9. Migrates any existing per-repo model cache to the shared location (or removes it if shared cache already exists)
-10. Pre-downloads the embedding model (~90MB) to `~/.mcp-local-rag-models` (shared across repos, one-time)
+4. If `--submodule`: wires `backlog/` as a git submodule (handles fresh init, conversion from plain dir, and fresh clones)
+5. Installs `mcp-local-rag` as a local dependency
+6. Copies `rag-server.mjs` (auto-ingest wrapper with backlog-named MCP tools)
+7. Copies `backlog-commit-hook.sh` (auto-commit hook for task file changes)
+8. Installs the `backlog-semantic-search` skill to `.opencode/skills/`
+9. Writes `.mcp.json` (Claude Code / Cursor) and `opencode.json` (OpenCode)
+10. Updates `.gitignore` to exclude vector DB, model cache, and node_modules
+11. Appends backlog workflow instructions to `AGENTS.md` (with mode-appropriate commit guidance)
+12. Migrates any existing per-repo model cache to the shared location (or removes it if shared cache already exists)
+13. Pre-downloads the embedding model (~90MB) to `~/.mcp-local-rag-models` (shared across repos, one-time)
 
 Re-running is safe — it skips steps that are already done and migrates old per-repo caches automatically.
 
@@ -60,13 +128,14 @@ Re-running is safe — it skips steps that are already done and migrates old per
 
 ```
 your-project/
-  backlog/              # Kanban data (tasks, docs, milestones) — commit this
-  rag-server.mjs        # Auto-ingest MCP wrapper — commit this
-  .mcp.json             # MCP config for Claude Code / Cursor
-  opencode.json         # MCP config for OpenCode
-  .opencode/skills/     # AI agent skills (installed by setup.sh)
-  .lancedb/             # Vector database (gitignored)
-  node_modules/         # mcp-local-rag dependency (gitignored)
+  backlog/                  # Kanban data (tasks, docs, milestones) — commit this
+  rag-server.mjs            # Auto-ingest MCP wrapper — commit this
+  backlog-commit-hook.sh    # Auto-commit hook — commit this
+  .mcp.json                 # MCP config for Claude Code / Cursor
+  opencode.json             # MCP config for OpenCode
+  .opencode/skills/         # AI agent skills (installed by setup.sh)
+  .lancedb/                 # Vector database (gitignored)
+  node_modules/             # mcp-local-rag dependency (gitignored)
 
 ~/.mcp-local-rag-models/  # Shared embedding model cache (~97MB, one-time download)
 ```
@@ -120,6 +189,7 @@ The installed `backlog-semantic-search` skill teaches AI agents to prefer semant
 5. Removes deleted files from the vector index
 6. Starts a custom MCP server with backlog-named tools (`backlog_semantic_search`, etc.) over stdio
 7. **Starts a file watcher** on `BASE_DIR` — file changes are detected, debounced (300ms), and synced to the vector DB automatically
+8. **Triggers auto-commit** — after each successful ingest/remove, schedules a git commit (2s debounce) via `backlog-commit-hook.sh`
 
 Cold start (model loading): ~15s. Warm start (no changes): instant. One new file: ~5s.
 
@@ -147,6 +217,44 @@ Raw backlog task files contain YAML frontmatter, dates, HTML section markers, an
 
 Non-backlog files (`.txt`, `.pdf`, `.docx`, regular `.md`) are ingested raw.
 
+## How auto-commit works
+
+When the file watcher detects a task file change (after ingestion/removal), it also schedules an automatic git commit. This means task creates, edits, status changes, completions, and archives are committed without agents needing to think about it.
+
+### Commit batching
+
+Multiple file changes within a **2-second window** are batched into a single commit. This handles multi-field edits (e.g., changing status + adding a note) that produce rapid sequential file events.
+
+### Git mode detection
+
+The hook script (`backlog-commit-hook.sh`) detects how `backlog/` is set up and commits accordingly:
+
+| Git mode | Detection | Behavior |
+|----------|-----------|----------|
+| **Submodule** | `backlog/.git` exists as file (gitdir pointer) | `git add -A` → commit → `pull --rebase` → push |
+| **Plain repo** | Parent directory is a git repo | `git add backlog/` → commit (no push) |
+| **No git** | No git repo detected | No-op (logs skip message) |
+
+In submodule mode, the hook also pushes after committing. Push failures are logged as warnings but never crash the server.
+
+### Commit messages
+
+Messages are auto-generated from the operation context:
+
+- `backlog: update TASK-21` — single task edited
+- `backlog: update TASK-5, TASK-12` — multiple tasks in one batch
+- `backlog: update tasks` — fallback when task ID can't be extracted
+
+### Disabling auto-commit
+
+Set `BACKLOG_AUTO_COMMIT=false` in your environment or MCP config:
+
+```bash
+BACKLOG_AUTO_COMMIT=false node rag-server.mjs
+```
+
+All other functionality (ingestion, semantic search, file watching) continues normally — only the git commit step is skipped.
+
 ## Performance
 
 Tested with 110 tasks across 10 domains (auth, database, API, frontend, DevOps, monitoring, security, testing, documentation, performance):
@@ -171,6 +279,8 @@ AI Editor (OpenCode / Claude Code / Cursor)
   │
   └─► backlog-rag MCP server — rag-server.mjs (stdio)
         ├─► auto-ingest on startup
+        ├─► file watcher (live sync + auto-commit trigger)
+        │     └─► backlog-commit-hook.sh (git add → commit → push)
         └─► backlog_semantic_search + 5 admin tools
               └─► .lancedb/ (LanceDB vector store)
 ```
@@ -191,6 +301,7 @@ All set automatically by the MCP configs, but can be overridden:
 | `MODEL_NAME` | `Xenova/all-MiniLM-L6-v2` | HuggingFace embedding model |
 | `MAX_FILE_SIZE` | `104857600` (100MB) | Max file size for ingestion |
 | `EXCLUDE_PATTERNS` | *(none)* | Additional comma-separated exclusion patterns (gitignore-style globs) |
+| `BACKLOG_AUTO_COMMIT` | `true` | Set to `false` to disable automatic git commits on task file changes |
 
 ### Model cache
 
