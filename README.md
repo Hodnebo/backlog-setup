@@ -112,7 +112,7 @@ The installed `backlog-semantic-search` skill teaches AI agents when to use each
 
 `rag-server.mjs` wraps `mcp-local-rag` and adds startup-time sync plus live file watching:
 
-1. Scans `backlog/` recursively for `.md`, `.txt`, `.pdf`, `.docx` files
+1. Scans `backlog/` recursively for `.md`, `.txt`, `.pdf`, `.docx` files (skipping excluded directories and files)
 2. Computes SHA-256 content hashes and compares against `.lancedb/.ingest-hashes.json`
 3. **Preprocesses backlog tasks** — strips YAML noise, HTML markers, and assembles clean embedding-friendly text
 4. Ingests only new or changed files into LanceDB
@@ -189,6 +189,7 @@ All set automatically by the MCP configs, but can be overridden:
 | `CACHE_DIR` | `~/.mcp-local-rag-models` | Embedding model cache (shared across repos) |
 | `MODEL_NAME` | `Xenova/all-MiniLM-L6-v2` | HuggingFace embedding model |
 | `MAX_FILE_SIZE` | `104857600` (100MB) | Max file size for ingestion |
+| `EXCLUDE_PATTERNS` | *(none)* | Additional comma-separated exclusion patterns (gitignore-style globs) |
 
 ### Model cache
 
@@ -201,6 +202,51 @@ To use a per-project cache instead (e.g., for offline/isolated environments), pa
 ```
 
 This stores the model in `TARGET_DIR/.mcp-local-rag-models` instead of the shared location.
+
+### Exclusion patterns
+
+The recursive file scanner and live file watcher skip directories and files matching exclusion patterns. This prevents indexing `.git`, `node_modules`, and other irrelevant content when `BASE_DIR` is broader than `backlog/`.
+
+**Default exclusions** (always active):
+
+- `.git`
+- `node_modules`
+- `.lancedb`
+- `.mcp-local-rag-models`
+- `.DS_Store`
+- `.opencode`
+
+**Custom exclusions** — two methods:
+
+1. **Environment variable** — set `EXCLUDE_PATTERNS` with comma-separated gitignore-style globs:
+
+   ```bash
+   EXCLUDE_PATTERNS="dist,*.log,build/**" node rag-server.mjs
+   ```
+
+2. **`.ragignore` file** — create a `.ragignore` file in `BASE_DIR` with one pattern per line:
+
+   ```
+   # Ignore build artifacts
+   dist
+   build/**
+
+   # Ignore log files
+   *.log
+
+   # Ignore a specific subdirectory from root
+   /vendor
+   ```
+
+**Supported glob syntax**:
+
+| Pattern | Matches |
+|---------|---------|
+| `foo` | Any path segment named `foo` (e.g., `a/foo/b`, `foo`) |
+| `*.log` | Files ending in `.log` anywhere |
+| `build/**` | Everything under any `build/` directory |
+| `/vendor` | `vendor` only at the root of `BASE_DIR` |
+| `temp/` | Directories named `temp` (trailing slash stripped, same as `temp`) |
 
 ## License
 

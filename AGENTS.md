@@ -23,6 +23,7 @@ BASE_DIR=./backlog DB_PATH=./.lancedb CACHE_DIR=~/.mcp-local-rag-models node rag
 3. **Content hashing** — SHA-256 in `.lancedb/.ingest-hashes.json`. Only re-ingest changed files.
 4. **Dual deletion** — try both `source`-based (`backlog://` URI) and `filePath`-based deletion when removing indexed files.
 5. **Backlog task detection** — YAML frontmatter with both `id:` and `title:` fields.
+6. **Directory exclusion** — `findFiles()` and the file watcher skip paths matching exclusion patterns. Defaults: `.git`, `node_modules`, `.lancedb`, `.mcp-local-rag-models`, `.DS_Store`, `.opencode`. Custom patterns via `EXCLUDE_PATTERNS` env var or `.ragignore` file. Glob-to-regex conversion in `globToRegex()`.
 
 ## Git
 
