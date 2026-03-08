@@ -665,7 +665,9 @@ AGENTS_MARKER_END="<!-- BACKLOG_WORKFLOW:END -->"
 if [ "$UPDATE_MODE" = true ] && [ -f "AGENTS.md" ] && grep -qF "$AGENTS_MARKER" AGENTS.md; then
     TEMP_FILE=$(mktemp)
     sed "/$AGENTS_MARKER/,/$AGENTS_MARKER_END/d" AGENTS.md > "$TEMP_FILE"
-    mv "$TEMP_FILE" AGENTS.md
+    sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$TEMP_FILE" > "${TEMP_FILE}.trim"
+    mv "${TEMP_FILE}.trim" AGENTS.md
+    rm -f "$TEMP_FILE"
     info "Removed old Backlog Workflow section from AGENTS.md"
 fi
 
