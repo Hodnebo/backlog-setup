@@ -1,9 +1,10 @@
 ---
 id: TASK-25
 title: Fix anchored glob patterns ignored for bare names
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-03-08 14:32'
+updated_date: '2026-03-08 16:31'
 labels:
   - bug
   - rag-server
