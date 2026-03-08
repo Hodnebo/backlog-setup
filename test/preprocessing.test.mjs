@@ -4,7 +4,7 @@ import {
   isBacklogTask,
   preprocessBacklogTask,
   MIN_CHUNK_LENGTH,
-} from "./rag-utils.mjs";
+} from "../lib/preprocessing.mjs";
 
 // ---------------------------------------------------------------------------
 // Helpers

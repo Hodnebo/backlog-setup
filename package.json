@@ -4,7 +4,7 @@
   "description": "One-command AI kanban board with semantic search for any repo.",
   "main": "index.js",
   "scripts": {
-    "test": "node --test rag-utils.*.test.mjs"
+    "test": "node --test test/*.test.mjs"
   },
   "repository": {
     "type": "git",

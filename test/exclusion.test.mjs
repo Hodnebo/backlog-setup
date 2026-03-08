@@ -5,7 +5,7 @@ import {
   isExcluded,
   escapeRegex,
   DEFAULT_EXCLUDE_PATTERNS,
-} from "./rag-utils.mjs";
+} from "../lib/exclusion.mjs";
 
 // ---------------------------------------------------------------------------
 // escapeRegex

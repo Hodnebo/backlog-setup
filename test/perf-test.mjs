@@ -9,7 +9,7 @@
  *   2. Irrelevant tasks are NOT returned (no bloat)
  *   3. Response sizes stay context-friendly
  *
- * Usage: node perf-test.mjs
+ * Usage: node test/perf-test.mjs
  */
 
 import { execSync } from "node:child_process";

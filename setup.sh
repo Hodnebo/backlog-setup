@@ -282,20 +282,27 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Copy rag-server.mjs (auto-ingest wrapper)
+# Copy lib/ directory (modular RAG server)
 # ─────────────────────────────────────────────────────────────────────────────
 
-RAG_SERVER_SRC="$SCRIPT_DIR/rag-server.mjs"
+LIB_SRC_DIR="$SCRIPT_DIR/lib"
 REPO_RAW="https://raw.githubusercontent.com/Hodnebo/backlog-setup/main"
+LIB_FILES="rag-server.mjs preprocessing.mjs exclusion.mjs discovery.mjs hashing.mjs ingestion.mjs"
 
-if [ ! -f "$RAG_SERVER_SRC" ]; then
-  RAG_SERVER_SRC="/tmp/backlog-setup-rag-server.mjs"
-  curl -fsSL "$REPO_RAW/rag-server.mjs" -o "$RAG_SERVER_SRC" 2>/dev/null || \
-    fail "Could not download rag-server.mjs. Run setup from the cloned repo instead."
+if [ -d "$LIB_SRC_DIR" ]; then
+  mkdir -p "$TARGET_DIR/lib"
+  for f in $LIB_FILES; do
+    cp "$LIB_SRC_DIR/$f" "$TARGET_DIR/lib/$f"
+  done
+else
+  mkdir -p "$TARGET_DIR/lib"
+  for f in $LIB_FILES; do
+    curl -fsSL "$REPO_RAW/lib/$f" -o "$TARGET_DIR/lib/$f" 2>/dev/null || \
+      fail "Could not download lib/$f. Run setup from the cloned repo instead."
+  done
 fi
 
-cp "$RAG_SERVER_SRC" "$TARGET_DIR/rag-server.mjs"
-ok "rag-server.mjs installed"
+ok "lib/ modules installed ($(echo $LIB_FILES | wc -w | tr -d ' ') files)"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Copy backlog-commit-hook.sh (auto-commit after task operations)
@@ -350,7 +357,7 @@ else
     },
     "backlog-rag": {
       "command": "node",
-      "args": ["$TARGET_DIR/rag-server.mjs"],
+      "args": ["$TARGET_DIR/lib/rag-server.mjs"],
       "env": {
         "BASE_DIR": "$TARGET_DIR/backlog",
         "DB_PATH": "$TARGET_DIR/.lancedb",
@@ -381,7 +388,7 @@ else
     },
     "backlog-rag": {
       "type": "local",
-      "command": ["node", "$TARGET_DIR/rag-server.mjs"],
+      "command": ["node", "$TARGET_DIR/lib/rag-server.mjs"],
       "environment": {
         "BASE_DIR": "$TARGET_DIR/backlog",
         "DB_PATH": "$TARGET_DIR/.lancedb",
@@ -583,7 +590,7 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo ""
 echo "  Files created:"
 echo "    backlog/                 — kanban board data (tasks, docs, milestones)"
-echo "    rag-server.mjs           — auto-ingest MCP wrapper"
+echo "    lib/                     — modular RAG server (6 modules)"
 echo "    backlog-commit-hook.sh   — auto-commit after task operations"
 echo "    .mcp.json                — MCP config for Claude Code / Cursor"
 echo "    opencode.json            — MCP config for OpenCode"

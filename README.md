@@ -20,7 +20,7 @@ Combines [Backlog.md](https://github.com/MrLesk/Backlog.md) (markdown kanban + M
 ## Quick start
 
 ```bash
-# Clone this repo (or download setup.sh + rag-server.mjs)
+# Clone this repo (or download setup.sh + lib/)
 git clone https://github.com/Hodnebo/backlog-setup.git ~/backlog-setup
 
 # Run in your target project
@@ -75,7 +75,7 @@ Everything else works identically — MCP tools, semantic search, auto-commit al
 3. Runs `backlog init` with MCP integration mode
 4. If `--submodule`: wires `backlog/` as a git submodule (handles fresh init, conversion from plain dir, and fresh clones)
 5. Installs `mcp-local-rag` as a local dependency
-6. Copies `rag-server.mjs` (auto-ingest wrapper with backlog-named MCP tools)
+6. Copies `lib/` directory (modular RAG server with auto-ingest, preprocessing, and backlog-named MCP tools)
 7. Copies `backlog-commit-hook.sh` (auto-commit hook for task file changes)
 8. Installs the `backlog-semantic-search` skill to `.opencode/skills/`
 9. Writes `.mcp.json` (Claude Code / Cursor) and `opencode.json` (OpenCode)
@@ -91,7 +91,13 @@ Re-running is safe — it skips steps that are already done and migrates old per
 ```
 your-project/
   backlog/                  # Kanban data (tasks, docs, milestones) — commit this
-  rag-server.mjs            # Auto-ingest MCP wrapper — commit this
+  lib/                      # Modular RAG server — commit this
+    rag-server.mjs          #   Entry point (env config, MCP server, file watcher)
+    preprocessing.mjs       #   Backlog task detection and text preprocessing
+    exclusion.mjs           #   Directory/file exclusion patterns
+    discovery.mjs           #   File discovery (recursive scan)
+    hashing.mjs             #   Content hashing (SHA-256 change detection)
+    ingestion.mjs           #   File ingestion/removal with retry logic
   backlog-commit-hook.sh    # Auto-commit hook — commit this
   .mcp.json                 # MCP config for Claude Code / Cursor
   opencode.json             # MCP config for OpenCode
@@ -142,7 +148,7 @@ The installed `backlog-semantic-search` skill teaches AI agents to prefer semant
 
 ## How it works behind the scenes
 
-**Auto-ingestion** — `rag-server.mjs` scans `backlog/` on startup, hashes files, and ingests new/changed ones into a local vector DB. A file watcher keeps everything in sync during long editor sessions.
+**Auto-ingestion** — `lib/rag-server.mjs` scans `backlog/` on startup, hashes files, and ingests new/changed ones into a local vector DB. A file watcher keeps everything in sync during long editor sessions.
 
 **Auto-commit** — after each file change, a git commit is scheduled with a 2-second debounce (so multi-field edits produce one commit). The hook script detects your git setup (submodule → commit + push, plain repo → commit only, no git → no-op). Disable with `BACKLOG_AUTO_COMMIT=false`.
 
@@ -162,7 +168,7 @@ AI Editor (OpenCode / Claude Code / Cursor)
   |-- backlog MCP server (stdio)
   |     '-- backlog/ directory (markdown task files)
   |
-  '-- backlog-rag MCP server -- rag-server.mjs (stdio)
+  '-- backlog-rag MCP server -- lib/rag-server.mjs (stdio)
         |-- auto-ingest on startup
         |-- file watcher (live sync + auto-commit trigger)
         |     '-- backlog-commit-hook.sh (git add -> commit -> push)
