@@ -110,6 +110,12 @@ fi
 TARGET_DIR="${TARGET_DIR:-$(pwd)}"
 TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 
+# Detect self-install (running setup.sh inside its own repo)
+SELF_INSTALL=false
+if [ "$SCRIPT_DIR" = "$TARGET_DIR" ]; then
+  SELF_INSTALL=true
+fi
+
 SHARED_CACHE="$HOME/.mcp-local-rag-models"
 LOCAL_CACHE_DIR="$TARGET_DIR/.mcp-local-rag-models"
 
@@ -297,7 +303,9 @@ LIB_SRC_DIR="$SCRIPT_DIR/lib"
 REPO_RAW="https://raw.githubusercontent.com/Hodnebo/backlog-setup/main"
 LIB_FILES="rag-server.mjs preprocessing.mjs exclusion.mjs discovery.mjs hashing.mjs ingestion.mjs workflow-guides.mjs backlog-proxy.mjs"
 
-if [ -d "$LIB_SRC_DIR" ]; then
+if [ "$SELF_INSTALL" = true ]; then
+  ok "lib/ modules already in place (self-install)"
+elif [ -d "$LIB_SRC_DIR" ]; then
   mkdir -p "$TARGET_DIR/lib"
   for f in $LIB_FILES; do
     cp "$LIB_SRC_DIR/$f" "$TARGET_DIR/lib/$f"
@@ -324,7 +332,9 @@ if [ ! -f "$COMMIT_HOOK_SRC" ]; then
     warn "Could not download backlog-commit-hook.sh — auto-commit disabled"
 fi
 
-if [ -f "$COMMIT_HOOK_SRC" ]; then
+if [ "$SELF_INSTALL" = true ]; then
+  ok "backlog-commit-hook.sh already in place (self-install)"
+elif [ -f "$COMMIT_HOOK_SRC" ]; then
   cp "$COMMIT_HOOK_SRC" "$TARGET_DIR/backlog-commit-hook.sh"
   chmod +x "$TARGET_DIR/backlog-commit-hook.sh"
   ok "backlog-commit-hook.sh installed"
@@ -337,7 +347,9 @@ fi
 SKILL_SRC="$SCRIPT_DIR/skills/backlog-semantic-search.md"
 SKILL_DEST="$TARGET_DIR/.opencode/skills/backlog-semantic-search.md"
 
-if [ -f "$SKILL_SRC" ]; then
+if [ "$SELF_INSTALL" = true ]; then
+  ok "Skill already in place (self-install)"
+elif [ -f "$SKILL_SRC" ]; then
   mkdir -p "$TARGET_DIR/.opencode/skills"
   cp "$SKILL_SRC" "$SKILL_DEST"
   ok "Backlog semantic search skill installed (.opencode/skills/)"
