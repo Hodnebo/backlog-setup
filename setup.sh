@@ -37,6 +37,7 @@ fail()  { echo -e "${RED}[error]${NC} $*"; exit 1; }
 LOCAL_CACHE=false
 SUBMODULE_MODE=false
 BACKLOG_REMOTE=""
+UPDATE_MODE=false
 TARGET_DIR=""
 
 usage() {
@@ -54,6 +55,9 @@ Options:
   --backlog-remote <url>      Remote URL for the backlog submodule repo. Requires
                               --submodule. If omitted with --submodule, a local
                               repo is created (add remote later).
+  --update                    Refresh MCP configs and AGENTS.md workflow section
+                              from latest templates. Backs up existing configs
+                              as .bak before overwriting.
   --help                      Show this help message and exit.
 EOF
   exit 0
@@ -73,6 +77,10 @@ while [[ $# -gt 0 ]]; do
       [[ -z "${2:-}" ]] && fail "--backlog-remote requires a URL argument"
       BACKLOG_REMOTE="$2"
       shift 2
+      ;;
+    --update)
+      UPDATE_MODE=true
+      shift
       ;;
     --help|-h)
       usage
@@ -342,9 +350,13 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 
 # .mcp.json (Claude Code / Cursor)
-if [ -f ".mcp.json" ]; then
-  warn ".mcp.json already exists — skipping (check manually if MCP servers are configured)"
+if [ -f ".mcp.json" ] && [ "$UPDATE_MODE" = false ]; then
+  warn ".mcp.json already exists — skipping (use --update to refresh)"
 else
+  if [ -f ".mcp.json" ]; then
+    cp ".mcp.json" ".mcp.json.bak"
+    info "Backed up .mcp.json → .mcp.json.bak"
+  fi
   cat > .mcp.json <<MCPJSON
 {
   "mcpServers": {
@@ -371,9 +383,13 @@ MCPJSON
 fi
 
 # opencode.json (OpenCode)
-if [ -f "opencode.json" ]; then
-  warn "opencode.json already exists — skipping (check manually if MCP servers are configured)"
+if [ -f "opencode.json" ] && [ "$UPDATE_MODE" = false ]; then
+  warn "opencode.json already exists — skipping (use --update to refresh)"
 else
+  if [ -f "opencode.json" ]; then
+    cp "opencode.json" "opencode.json.bak"
+    info "Backed up opencode.json → opencode.json.bak"
+  fi
   cat > opencode.json <<OCJSON
 {
   "\$schema": "https://opencode.ai/config.json",
@@ -442,12 +458,23 @@ fi
 # Append backlog workflow to AGENTS.md
 # ─────────────────────────────────────────────────────────────────────────────
 
-AGENTS_MARKER="## Backlog Workflow"
+AGENTS_MARKER="<!-- BACKLOG_WORKFLOW:BEGIN -->"
+AGENTS_MARKER_END="<!-- BACKLOG_WORKFLOW:END -->"
+
+# If --update, remove old Backlog Workflow section so it gets re-appended below
+if [ "$UPDATE_MODE" = true ] && [ -f "AGENTS.md" ] && grep -qF "$AGENTS_MARKER" AGENTS.md; then
+    TEMP_FILE=$(mktemp)
+    sed "/$AGENTS_MARKER/,/$AGENTS_MARKER_END/d" AGENTS.md > "$TEMP_FILE"
+    mv "$TEMP_FILE" AGENTS.md
+    info "Removed old Backlog Workflow section from AGENTS.md"
+fi
 
 if [ -f "AGENTS.md" ] && grep -qF "$AGENTS_MARKER" AGENTS.md; then
   ok "AGENTS.md already has backlog workflow section"
 else
   cat >> AGENTS.md <<'AGENTSEOF'
+
+<!-- BACKLOG_WORKFLOW:BEGIN -->
 
 ## Backlog Workflow
 
@@ -470,66 +497,7 @@ After completing work:
 Use `backlog_semantic_search` for natural-language task discovery ("what needs performance work?") and `backlog_task_search` for exact lookups ("TASK-12", "authentication").
 AGENTSEOF
 
-  if [ "$SUBMODULE_MODE" = true ]; then
-    cat >> AGENTS.md <<'AGENTSEOF'
-
-### Committing backlog changes (submodule mode)
-
-The `backlog/` directory is a git submodule with its own repository. Commit task changes inside the submodule — not in the parent repo.
-
-```bash
-cd backlog
-git pull --rebase origin main
-git add -A
-git commit -m "backlog: <short summary of what changed>"
-git push origin main
-cd ..
-```
-
-**When to commit:**
-- After creating or editing tasks as part of planning (not after every single field edit — batch related changes)
-- After moving tasks to a new status (e.g. marking tasks Done at the end of a work session)
-- After writing a finalSummary on a completed task
-
-**When NOT to commit backlog separately:**
-- Mid-implementation — finish your current work first, then commit backlog changes
-
-**Updating the submodule pointer in the parent repo:**
-Only update the parent repo's submodule reference at meaningful boundaries (e.g. end of a sprint, milestone, or when explicitly asked). This keeps the parent repo history clean.
-
-```bash
-git add backlog
-git commit -m "Update backlog submodule pointer"
-```
-AGENTSEOF
-  else
-    cat >> AGENTS.md <<'AGENTSEOF'
-
-### Committing backlog changes
-
-After completing a batch of backlog operations (creating tasks, editing descriptions, moving status), commit the changed files in `backlog/`:
-
-```bash
-git add backlog/
-git commit -m "backlog: <short summary of what changed>"
-```
-
-**When to commit:**
-- After creating or editing tasks as part of planning (not after every single field edit — batch related changes)
-- After moving tasks to a new status (e.g. marking tasks Done at the end of a work session)
-- After writing a finalSummary on a completed task
-
-**When NOT to commit backlog separately:**
-- If you are about to commit implementation code that includes backlog changes — combine them into one commit
-- Mid-implementation — finish your current work first, then commit backlog changes
-
-Keep backlog commits small and descriptive. Examples:
-- `backlog: create tasks for auth module`
-- `backlog: move TASK-5 to Done, add final summary`
-- `backlog: update TASK-3 description and acceptance criteria`
-AGENTSEOF
-  fi
-
+  echo '<!-- BACKLOG_WORKFLOW:END -->' >> AGENTS.md
   ok "AGENTS.md updated with backlog workflow"
 fi
 

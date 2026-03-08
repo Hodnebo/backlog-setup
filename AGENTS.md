@@ -54,3 +54,26 @@ skills/
 ## Git
 
 Imperative mood commits, no conventional-commits prefix. Gitignored: `.mcp.json`, `opencode.json`, `.lancedb/`, `.mcp-local-rag-models/`, `node_modules/`. Keep `README.md` updated when changing behavior.
+
+<!-- BACKLOG_WORKFLOW:BEGIN -->
+
+## Backlog Workflow
+
+Before starting any work:
+
+1. Run `backlog_task_list` to see current tasks and their statuses
+2. Check if the work you are about to do is already tracked as a task
+
+While working:
+
+- If no task exists for your work, create one with `backlog_task_create` and set status to "In Progress"
+- If a task exists, move it to "In Progress" with `backlog_task_edit`
+- Break large efforts into subtasks
+
+After completing work:
+
+- Use `backlog_task_complete` to mark the task as complete (do NOT use `backlog_task_edit` to set status to Done)
+- Fill in the `finalSummary` with what changed and why
+
+Use `backlog_semantic_search` for natural-language task discovery ("what needs performance work?") and `backlog_task_search` for exact lookups ("TASK-12", "authentication").
+<!-- BACKLOG_WORKFLOW:END -->

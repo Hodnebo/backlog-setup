@@ -42,6 +42,16 @@ To use a per-repo model cache instead of the shared one:
 
 That's it. Open the project in OpenCode, Claude Code, or Cursor — both MCP servers start automatically.
 
+### Updating existing installations
+
+To refresh MCP configs and the AGENTS.md workflow section after upgrading backlog-setup:
+
+```bash
+~/backlog-setup/setup.sh --update /path/to/your/project
+```
+
+This backs up existing configs as `.bak` before overwriting. Without `--update`, existing configs are skipped.
+
 ## Submodule mode (optional)
 
 By default, `backlog/` is a plain directory tracked by your project's git. For teams or multi-agent workflows where frequent task commits create noise in the main repo, you can isolate backlog history in a separate git repository wired as a submodule.
@@ -80,11 +90,11 @@ Everything else works identically — MCP tools, semantic search, auto-commit al
 8. Installs the `backlog-semantic-search` skill to `.opencode/skills/`
 9. Writes `.mcp.json` (Claude Code / Cursor) and `opencode.json` (OpenCode)
 10. Updates `.gitignore` to exclude vector DB, model cache, and node_modules
-11. Appends backlog workflow instructions to `AGENTS.md` (with mode-appropriate commit guidance)
+11. Appends backlog workflow instructions to `AGENTS.md` (with update-safe markers)
 12. Migrates any existing per-repo model cache to the shared location (or removes it if shared cache already exists)
 13. Pre-downloads the embedding model (~90MB) to `~/.mcp-local-rag-models` (shared across repos, one-time)
 
-Re-running is safe — it skips steps that are already done and migrates old per-repo caches automatically.
+Re-running is safe — it skips steps that are already done and migrates old per-repo caches automatically. Use `--update` to refresh MCP configs and the AGENTS.md workflow section from the latest templates.
 
 ## Files created in your project
 
