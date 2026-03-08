@@ -583,10 +583,10 @@ function createMcpServer() {
 
   server.tool(
     "backlog_semantic_search",
-    "Semantic search over backlog tasks and project documents; " +
-    "finds results by meaning, synonyms, and conceptual similarity; " +
-    "use for natural-language queries like 'authentication issues' or 'performance improvements'; " +
-    "complements backlog_task_search (keyword/fuzzy) with deeper conceptual matching; " +
+    "PRIMARY search tool for backlog tasks and project documents; " +
+    "use this FIRST for any task search — it finds results by meaning, synonyms, and conceptual similarity; " +
+    "handles natural-language queries like 'authentication issues' or 'performance improvements'; " +
+    "prefer over backlog_task_search which is only for exact task ID lookups or structured filtering; " +
     "returns matched text with source and relevance score (0 = best)",
     {
       query: z.string().describe(

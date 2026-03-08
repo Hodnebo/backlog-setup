@@ -91,15 +91,16 @@ backlog task view TASK-1         # View a specific task
 
 ### Semantic search vs keyword search
 
-Your AI editor has two ways to search tasks:
+Your AI editor has two ways to search tasks. **Semantic search is the primary method** — it finds results by meaning, synonyms, and conceptual similarity. Keyword search is supplementary for exact ID lookups and structured filtering.
 
-| | `backlog_semantic_search` | `backlog_task_search` |
+| | `backlog_semantic_search` (primary) | `backlog_task_search` (supplementary) |
 |---|---|---|
 | **Engine** | Vector embeddings (LanceDB) | Fuzzy keyword (Fuse.js) |
 | **Best for** | Conceptual queries, synonyms, natural language | Exact IDs, titles, labels, known keywords |
 | **Example** | "tasks about performance" | "TASK-42", "authentication" |
+| **When** | Default for all searches | Exact ID lookup or structured filtering only |
 
-The installed `backlog-semantic-search` skill teaches AI agents when to use each tool automatically.
+The installed `backlog-semantic-search` skill teaches AI agents to prefer semantic search as the default.
 
 ### Example AI prompts
 

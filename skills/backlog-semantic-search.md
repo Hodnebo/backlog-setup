@@ -1,50 +1,49 @@
 ---
 name: backlog-semantic-search
 description: >
-  Guide for searching backlog tasks effectively using two complementary search tools.
-  Use when searching tasks, finding work items, querying the backlog, or when search
-  results from one tool are insufficient. Triggers on: "search tasks", "find tasks",
-  "look for tasks", "query backlog", "search backlog", "related tasks", "similar tasks",
-  "tasks about", "tasks related to", or any task discovery intent.
+  MANDATORY: Use backlog_semantic_search as the PRIMARY search tool for all backlog queries.
+  Do NOT call backlog_task_search in parallel — call semantic search first, then keyword search
+  only if needed. Triggers on: "search tasks", "find tasks", "look for tasks", "query backlog",
+  "search backlog", "related tasks", "similar tasks", "tasks about", "tasks related to",
+  or any task discovery intent.
 ---
 
-# Backlog Search: Semantic vs Keyword
+# Backlog Search: Semantic First
 
-Two search tools exist for backlog tasks. Use both strategically.
+**RULE: Always call `backlog_semantic_search` FIRST. Do NOT call `backlog_task_search` alongside it.**
 
-## Tool Comparison
+Semantic search finds results by meaning, synonyms, and conceptual similarity. Keyword search (`backlog_task_search`) is a fallback for exact ID lookups only.
 
-| | `backlog_semantic_search` | `backlog_task_search` |
-|---|---|---|
-| **Engine** | Vector embeddings (LanceDB) | Fuzzy keyword (Fuse.js, Bitap) |
-| **Strengths** | Synonyms, concepts, intent, natural language | Exact IDs, titles, labels, known keywords |
-| **Scoring** | 0 = best, higher = worse | threshold 0.35 |
-| **Best for** | "tasks about performance" | "TASK-42", "authentication" |
+## MUST DO
+
+- Call `backlog_semantic_search` as your FIRST and PRIMARY search tool
+- Wait for semantic results before deciding if keyword search is needed
+- Use descriptive phrases, not single keywords ("tasks about improving API response time" not "performance")
+
+## MUST NOT DO
+
+- Do NOT call `backlog_task_search` in parallel with `backlog_semantic_search`
+- Do NOT use `backlog_task_search` as your first search call (unless looking up an exact task ID like "TASK-42")
+- Do NOT treat both tools as equals — semantic search is primary, keyword search is fallback
 
 ## When to Use Each
 
-### Use `backlog_semantic_search` when:
-- Query is conceptual or descriptive ("things that slow down the app")
-- Looking for related/similar tasks without knowing exact wording
-- Exploring a topic area ("security concerns", "user experience issues")
-- Previous keyword search returned no results or irrelevant results
+### `backlog_semantic_search` — PRIMARY (use first, every time)
+- Any search query, conceptual or specific
 - Natural language questions ("what needs to be done for the API?")
+- Topic exploration ("security concerns", "user experience issues")
+- Finding related/similar tasks without knowing exact wording
 
-### Use `backlog_task_search` when:
-- Looking up a specific task ID ("TASK-15")
-- Searching for exact title text or label names
-- Filtering by known keywords that appear literally in tasks
-- Need structured filtering (by status, priority, labels)
+**Scoring**: 0 = best match. 0-0.5 = strong, 0.5-1.0 = moderate, >1.0 = weak.
+
+### `backlog_task_search` — FALLBACK ONLY
+- Looking up a specific task ID ("TASK-15") — this is the ONLY case to use it first
+- Semantic results were insufficient and you need exact keyword matching
+- Structured filtering by status, priority, or labels (or use `backlog_task_list` with filters)
 
 ## Decision Flow
 
-1. Know the exact ID or title? -> `backlog_task_search`
-2. Conceptual or exploratory query? -> `backlog_semantic_search`
-3. Keyword search returned poor results? -> Try `backlog_semantic_search`
-4. Semantic search too broad? -> Refine with `backlog_task_search`
-
-## Tips
-
-- Semantic search works best with descriptive phrases, not single words
-- Combine both tools: semantic to discover, keyword to filter/verify
-- Semantic search scores: 0-0.5 = strong match, 0.5-1.0 = moderate, >1.0 = weak
+1. **Any search** → `backlog_semantic_search` first
+2. **Know exact task ID?** → `backlog_task_search` (only exception)
+3. **Need status/priority filter?** → `backlog_task_list` with filters
+4. **Semantic results insufficient?** → Then try `backlog_task_search` as a second pass

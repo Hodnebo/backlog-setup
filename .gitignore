@@ -1,6 +1,7 @@
-# MCP configs (local to this machine)
+# MCP configs and editor state (local to this machine)
 .mcp.json
 opencode.json
+.opencode/
 
 # RAG vector database
 .lancedb/
