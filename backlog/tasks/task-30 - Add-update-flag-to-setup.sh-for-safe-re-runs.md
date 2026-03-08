@@ -1,7 +1,7 @@
 ---
 id: TASK-30
 title: Add --update flag to setup.sh for safe re-runs
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-08 18:45'
 labels:
