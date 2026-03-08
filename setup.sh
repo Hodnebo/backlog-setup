@@ -364,31 +364,43 @@ fi
 if [ -f ".mcp.json" ] && [ "$UPDATE_MODE" = false ]; then
   warn ".mcp.json already exists — skipping (use --update to refresh)"
 else
-  if [ -f ".mcp.json" ]; then
-    info "Overwriting .mcp.json with latest template"
-  fi
-  cat > .mcp.json <<MCPJSON
+  BACKLOG_MCP_SERVERS=$(cat <<MCPFRAG
 {
-  "mcpServers": {
-    "backlog": {
-      "command": "node",
-      "args": ["$TARGET_DIR/lib/backlog-proxy.mjs"],
-      "env": {
-        "BACKLOG_CWD": "$TARGET_DIR"
-      }
-    },
-    "backlog-rag": {
-      "command": "node",
-      "args": ["$TARGET_DIR/lib/rag-server.mjs"],
-      "env": {
-        "BASE_DIR": "$TARGET_DIR/backlog",
-        "DB_PATH": "$TARGET_DIR/.lancedb",
-        "CACHE_DIR": "$CACHE_DIR_VALUE"
-      }
+  "backlog": {
+    "command": "node",
+    "args": ["$TARGET_DIR/lib/backlog-proxy.mjs"],
+    "env": {
+      "BACKLOG_CWD": "$TARGET_DIR"
+    }
+  },
+  "backlog-rag": {
+    "command": "node",
+    "args": ["$TARGET_DIR/lib/rag-server.mjs"],
+    "env": {
+      "BASE_DIR": "$TARGET_DIR/backlog",
+      "DB_PATH": "$TARGET_DIR/.lancedb",
+      "CACHE_DIR": "$CACHE_DIR_VALUE"
     }
   }
 }
+MCPFRAG
+  )
+  if [ -f ".mcp.json" ]; then
+    node -e "
+      const fs = require('fs');
+      const existing = JSON.parse(fs.readFileSync('.mcp.json', 'utf8'));
+      const servers = JSON.parse(process.argv[1]);
+      existing.mcpServers = { ...existing.mcpServers, ...servers };
+      fs.writeFileSync('.mcp.json', JSON.stringify(existing, null, 2) + '\n');
+    " "$BACKLOG_MCP_SERVERS"
+    info "Merged backlog servers into existing .mcp.json"
+  else
+    cat > .mcp.json <<MCPJSON
+{
+  "mcpServers": $BACKLOG_MCP_SERVERS
+}
 MCPJSON
+  fi
   ok ".mcp.json created (Claude Code / Cursor)"
 fi
 
@@ -396,34 +408,46 @@ fi
 if [ -f "opencode.json" ] && [ "$UPDATE_MODE" = false ]; then
   warn "opencode.json already exists — skipping (use --update to refresh)"
 else
-  if [ -f "opencode.json" ]; then
-    info "Overwriting opencode.json with latest template"
-  fi
-  cat > opencode.json <<OCJSON
+  BACKLOG_OC_SERVERS=$(cat <<OCFRAG
 {
-  "\$schema": "https://opencode.ai/config.json",
-  "mcp": {
-    "backlog": {
-      "type": "local",
-      "command": ["node", "$TARGET_DIR/lib/backlog-proxy.mjs"],
-      "environment": {
-        "BACKLOG_CWD": "$TARGET_DIR"
-      },
-      "enabled": true
+  "backlog": {
+    "type": "local",
+    "command": ["node", "$TARGET_DIR/lib/backlog-proxy.mjs"],
+    "environment": {
+      "BACKLOG_CWD": "$TARGET_DIR"
     },
-    "backlog-rag": {
-      "type": "local",
-      "command": ["node", "$TARGET_DIR/lib/rag-server.mjs"],
-      "environment": {
-        "BASE_DIR": "$TARGET_DIR/backlog",
-        "DB_PATH": "$TARGET_DIR/.lancedb",
-        "CACHE_DIR": "$CACHE_DIR_VALUE"
-      },
-      "enabled": true
-    }
+    "enabled": true
+  },
+  "backlog-rag": {
+    "type": "local",
+    "command": ["node", "$TARGET_DIR/lib/rag-server.mjs"],
+    "environment": {
+      "BASE_DIR": "$TARGET_DIR/backlog",
+      "DB_PATH": "$TARGET_DIR/.lancedb",
+      "CACHE_DIR": "$CACHE_DIR_VALUE"
+    },
+    "enabled": true
   }
 }
+OCFRAG
+  )
+  if [ -f "opencode.json" ]; then
+    node -e "
+      const fs = require('fs');
+      const existing = JSON.parse(fs.readFileSync('opencode.json', 'utf8'));
+      const servers = JSON.parse(process.argv[1]);
+      existing.mcp = { ...existing.mcp, ...servers };
+      fs.writeFileSync('opencode.json', JSON.stringify(existing, null, 2) + '\n');
+    " "$BACKLOG_OC_SERVERS"
+    info "Merged backlog servers into existing opencode.json"
+  else
+    cat > opencode.json <<OCJSON
+{
+  "\$schema": "https://opencode.ai/config.json",
+  "mcp": $BACKLOG_OC_SERVERS
+}
 OCJSON
+  fi
   ok "opencode.json created (OpenCode)"
 fi
 

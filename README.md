@@ -50,7 +50,7 @@ To refresh MCP configs and the AGENTS.md workflow section after upgrading backlo
 ~/backlog-setup/setup.sh --update /path/to/your/project
 ```
 
-This overwrites existing configs with the latest templates. Without `--update`, existing configs are skipped.
+This merges the latest backlog server configs into existing MCP files (preserving other servers) and refreshes the AGENTS.md workflow section. Without `--update`, existing configs are skipped.
 
 ## Submodule mode (optional)
 
