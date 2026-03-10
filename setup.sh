@@ -506,7 +506,12 @@ elif [ -f "$SKILL_SRC" ]; then
   cp "$SKILL_SRC" "$SKILL_DEST"
   ok "Backlog semantic search skill installed (.opencode/skills/)"
 else
-  warn "Skill file not found at $SKILL_SRC — skipping skill install"
+  mkdir -p "$TARGET_DIR/.opencode/skills"
+  curl -fsSL "$REPO_RAW/skills/backlog-semantic-search.md" -o "$SKILL_DEST" 2>/dev/null || \
+    warn "Could not download backlog-semantic-search.md — skipping skill install"
+  if [ -f "$SKILL_DEST" ]; then
+    ok "Backlog semantic search skill installed (.opencode/skills/)"
+  fi
 fi
 fi
 
