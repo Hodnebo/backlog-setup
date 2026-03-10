@@ -1,9 +1,10 @@
 ---
 id: TASK-31
 title: Install lib/ to a shared location instead of copying into every project
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-10 15:44'
+updated_date: '2026-03-10 19:00'
 labels:
   - enhancement
   - setup
@@ -38,3 +39,9 @@ Currently setup.sh copies the entire lib/ directory into the target project. Eve
 - curl-pipe-bash install path needs to work too (download to shared location)
 - Consider what happens if the shared location is deleted or moved
 <!-- SECTION:DESCRIPTION:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Moved lib/, backlog-commit-hook.sh, and mcp-local-rag node_modules from per-project copies to a shared install at ~/.local/share/backlog-setup/. MCP configs in target projects now reference the shared location. setup.sh auto-migrates existing per-project installs on next run. README.md and AGENTS.md updated to reflect the new layout. All 90 tests pass, shell syntax validated.
+<!-- SECTION:FINAL_SUMMARY:END -->
