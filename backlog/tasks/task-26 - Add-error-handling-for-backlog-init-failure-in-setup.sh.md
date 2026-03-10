@@ -4,6 +4,7 @@ title: Add error handling for backlog init failure in setup.sh
 status: To Do
 assignee: []
 created_date: '2026-03-08 14:32'
+updated_date: '2026-03-10 13:47'
 labels:
   - bug
   - setup
@@ -11,6 +12,7 @@ dependencies: []
 references:
   - setup.sh
 priority: medium
+ordinal: 500
 ---
 
 ## Description

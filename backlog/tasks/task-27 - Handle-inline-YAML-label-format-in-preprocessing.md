@@ -4,6 +4,7 @@ title: Handle inline YAML label format in preprocessing
 status: To Do
 assignee: []
 created_date: '2026-03-08 14:32'
+updated_date: '2026-03-10 13:47'
 labels:
   - enhancement
   - rag-server
@@ -12,6 +13,7 @@ references:
   - lib/preprocessing.mjs
   - test/preprocessing.test.mjs
 priority: low
+ordinal: 1000
 ---
 
 ## Description
