@@ -44,13 +44,15 @@ That's it. Open the project in OpenCode, Claude Code, or Cursor — both MCP ser
 
 ### Updating existing installations
 
-To refresh MCP configs and the AGENTS.md workflow section after upgrading backlog-setup:
+Re-running `setup.sh` always refreshes the shared install (`~/.local/share/backlog-setup/`), so all projects get updated lib/ code automatically. To also refresh per-project MCP configs and the AGENTS.md workflow section:
 
 ```bash
 ~/backlog-setup/setup.sh --update /path/to/your/project
 ```
 
-This merges the latest backlog server configs into existing MCP files (preserving other servers) and refreshes the AGENTS.md workflow section. Without `--update`, existing configs are skipped.
+This merges the latest backlog server configs into existing MCP files (preserving other servers) and refreshes the AGENTS.md workflow section. Without `--update`, existing per-project configs are skipped.
+
+Projects that still have a local `lib/` directory are automatically migrated to the shared install on the next run.
 
 ## Submodule mode (optional)
 
@@ -84,40 +86,33 @@ Everything else works identically — MCP tools, semantic search, auto-commit al
 2. Installs `backlog.md` globally (if not already present)
 3. Runs `backlog init` with MCP integration mode
 4. If `--submodule`: wires `backlog/` as a git submodule (handles fresh init, conversion from plain dir, and fresh clones)
-5. Installs `mcp-local-rag` as a local dependency
-6. Copies `lib/` directory (modular RAG server with auto-ingest, preprocessing, and backlog-named MCP tools)
-7. Copies `backlog-commit-hook.sh` (auto-commit hook for task file changes)
-8. Installs the `backlog-semantic-search` skill to `.opencode/skills/`
-9. Writes `.mcp.json` (Claude Code / Cursor) and `opencode.json` (OpenCode)
-10. Updates `.gitignore` to exclude vector DB, model cache, and node_modules
-11. Appends backlog workflow instructions to `AGENTS.md` (with update-safe markers)
-12. Migrates any existing per-repo model cache to the shared location (or removes it if shared cache already exists)
-13. Pre-downloads the embedding model (~90MB) to `~/.mcp-local-rag-models` (shared across repos, one-time)
+5. Installs `lib/` modules, `backlog-commit-hook.sh`, and `mcp-local-rag` to `~/.local/share/backlog-setup/` (shared across all projects)
+6. Migrates any existing per-project `lib/` and `backlog-commit-hook.sh` to the shared location
+7. Installs the `backlog-semantic-search` skill to `.opencode/skills/`
+8. Writes `.mcp.json` (Claude Code / Cursor) and `opencode.json` (OpenCode) — pointing to the shared install
+9. Updates `.gitignore` to exclude vector DB, model cache, and node_modules
+10. Appends backlog workflow instructions to `AGENTS.md` (with update-safe markers)
+11. Migrates any existing per-repo model cache to the shared location (or removes it if shared cache already exists)
+12. Pre-downloads the embedding model (~90MB) to `~/.mcp-local-rag-models` (shared across repos, one-time)
 
-Re-running is safe — it skips steps that are already done and migrates old per-repo caches automatically. Use `--update` to refresh MCP configs and the AGENTS.md workflow section from the latest templates.
+Re-running is safe — it refreshes the shared install and skips per-project configs that already exist. Use `--update` to also refresh MCP configs and the AGENTS.md workflow section from the latest templates.
 
 ## Files created in your project
 
 ```
 your-project/
   backlog/                  # Kanban data (tasks, docs, milestones) — commit this
-  lib/                      # Modular RAG server + backlog proxy — commit this
-    rag-server.mjs          #   Entry point (env config, MCP server, file watcher)
-    preprocessing.mjs       #   Backlog task detection and text preprocessing
-    exclusion.mjs           #   Directory/file exclusion patterns
-    discovery.mjs           #   File discovery (recursive scan)
-    hashing.mjs             #   Content hashing (SHA-256 change detection)
-    ingestion.mjs           #   File ingestion/removal with retry logic
-    workflow-guides.mjs     #   Corrected workflow guide text
-    backlog-proxy.mjs       #   MCP proxy (intercepts guide tools, forwards the rest)
-  backlog-commit-hook.sh    # Auto-commit hook — commit this
   .mcp.json                 # MCP config for Claude Code / Cursor
   opencode.json             # MCP config for OpenCode
   .opencode/skills/         # AI agent skills (installed by setup.sh)
   .lancedb/                 # Vector database (gitignored)
-  node_modules/             # mcp-local-rag dependency (gitignored)
 
-~/.mcp-local-rag-models/  # Shared embedding model cache (~97MB, one-time download)
+~/.local/share/backlog-setup/   # Shared install (one copy, all projects)
+  lib/                          # Modular RAG server + backlog proxy (8 modules)
+  backlog-commit-hook.sh        # Auto-commit hook
+  node_modules/                 # mcp-local-rag dependency
+
+~/.mcp-local-rag-models/       # Shared embedding model cache (~97MB, one-time download)
 ```
 
 ## Usage
@@ -160,11 +155,13 @@ The installed `backlog-semantic-search` skill teaches AI agents to prefer semant
 
 ## How it works behind the scenes
 
-**Auto-ingestion** — `lib/rag-server.mjs` scans `backlog/` on startup, hashes files, and ingests new/changed ones into a local vector DB. A file watcher keeps everything in sync during long editor sessions.
+**Auto-ingestion** — `~/.local/share/backlog-setup/lib/rag-server.mjs` scans `backlog/` on startup, hashes files, and ingests new/changed ones into a local vector DB. A file watcher keeps everything in sync during long editor sessions.
 
 **Auto-commit** — after each file change, a git commit is scheduled with a 2-second debounce (so multi-field edits produce one commit). The hook script detects your git setup (submodule → commit + push, plain repo → commit only, no git → no-op). Disable with `BACKLOG_AUTO_COMMIT=false`.
 
 **Semantic search** — queries go through local embeddings (Xenova/all-MiniLM-L6-v2) stored in `.lancedb/`. No API keys, fully offline.
+
+**Shared install** — all infrastructure (`lib/`, `backlog-commit-hook.sh`, `node_modules/`) lives in `~/.local/share/backlog-setup/`. MCP configs in each project reference this shared location. Updating backlog-setup once propagates to all projects.
 
 For architecture diagrams, preprocessing details, benchmarks, and exclusion pattern syntax, see [docs/internals.md](docs/internals.md).
 
@@ -177,15 +174,15 @@ Tested with 110 tasks: 100% ingestion success, 80% recall, ~956 tokens per query
 ```
 AI Editor (OpenCode / Claude Code / Cursor)
   |
-  |-- backlog MCP proxy -- lib/backlog-proxy.mjs (stdio)
+  |-- backlog MCP proxy -- ~/.local/share/backlog-setup/lib/backlog-proxy.mjs (stdio)
   |     |-- intercepts 4 workflow guide tools (returns corrected text)
   |     '-- forwards all other tools to upstream backlog MCP
   |           '-- backlog/ directory (markdown task files)
   |
-  '-- backlog-rag MCP server -- lib/rag-server.mjs (stdio)
+  '-- backlog-rag MCP server -- ~/.local/share/backlog-setup/lib/rag-server.mjs (stdio)
         |-- auto-ingest on startup
         |-- file watcher (live sync + auto-commit trigger)
-        |     '-- backlog-commit-hook.sh (git add -> commit -> push)
+        |     '-- ~/.local/share/backlog-setup/backlog-commit-hook.sh
         '-- backlog_semantic_search + 5 admin tools
               '-- .lancedb/ (LanceDB vector store)
 ```

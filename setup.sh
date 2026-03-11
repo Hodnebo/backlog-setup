@@ -172,6 +172,7 @@ if [ "$SCRIPT_DIR" = "$TARGET_DIR" ]; then
   SELF_INSTALL=true
 fi
 
+SHARED_DIR="$HOME/.local/share/backlog-setup"
 SHARED_CACHE="$HOME/.mcp-local-rag-models"
 LOCAL_CACHE_DIR="$TARGET_DIR/.mcp-local-rag-models"
 
@@ -429,51 +430,31 @@ if [ "$SUBMODULE_MODE" = true ]; then
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Install mcp-local-rag as local dependency
-# ─────────────────────────────────────────────────────────────────────────────
-
-if [ -f "node_modules/mcp-local-rag/package.json" ]; then
-  ok "mcp-local-rag already installed"
-else
-  info "Installing mcp-local-rag..."
-
-  # Ensure package.json exists
-  if [ ! -f "package.json" ]; then
-    npm init -y --silent 2>/dev/null
-  fi
-
-  npm install mcp-local-rag --save --silent 2>/dev/null
-  ok "mcp-local-rag installed"
-fi
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Copy lib/ directory (modular RAG server)
+# Install shared components (~/.local/share/backlog-setup/)
 # ─────────────────────────────────────────────────────────────────────────────
 
 LIB_SRC_DIR="$SCRIPT_DIR/lib"
 REPO_RAW="https://raw.githubusercontent.com/Hodnebo/backlog-setup/main"
 LIB_FILES="rag-server.mjs preprocessing.mjs exclusion.mjs discovery.mjs hashing.mjs ingestion.mjs workflow-guides.mjs backlog-proxy.mjs"
 
-if [ "$SELF_INSTALL" = true ]; then
-  ok "lib/ modules already in place (self-install)"
-elif [ -d "$LIB_SRC_DIR" ]; then
-  mkdir -p "$TARGET_DIR/lib"
+info "Shared install location: $SHARED_DIR"
+
+# -- lib/ modules -------------------------------------------------------------
+
+mkdir -p "$SHARED_DIR/lib"
+if [ -d "$LIB_SRC_DIR" ]; then
   for f in $LIB_FILES; do
-    cp "$LIB_SRC_DIR/$f" "$TARGET_DIR/lib/$f"
+    cp "$LIB_SRC_DIR/$f" "$SHARED_DIR/lib/$f"
   done
 else
-  mkdir -p "$TARGET_DIR/lib"
   for f in $LIB_FILES; do
-    curl -fsSL "$REPO_RAW/lib/$f" -o "$TARGET_DIR/lib/$f" 2>/dev/null || \
+    curl -fsSL "$REPO_RAW/lib/$f" -o "$SHARED_DIR/lib/$f" 2>/dev/null || \
       fail "Could not download lib/$f. Run setup from the cloned repo instead."
   done
 fi
+ok "lib/ modules installed to shared location ($(echo $LIB_FILES | wc -w | tr -d ' ') files)"
 
-ok "lib/ modules installed ($(echo $LIB_FILES | wc -w | tr -d ' ') files)"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Copy backlog-commit-hook.sh (auto-commit after task operations)
-# ─────────────────────────────────────────────────────────────────────────────
+# -- backlog-commit-hook.sh --------------------------------------------------
 
 COMMIT_HOOK_SRC="$SCRIPT_DIR/backlog-commit-hook.sh"
 
@@ -483,12 +464,53 @@ if [ ! -f "$COMMIT_HOOK_SRC" ]; then
     warn "Could not download backlog-commit-hook.sh — auto-commit disabled"
 fi
 
-if [ "$SELF_INSTALL" = true ]; then
-  ok "backlog-commit-hook.sh already in place (self-install)"
-elif [ -f "$COMMIT_HOOK_SRC" ]; then
-  cp "$COMMIT_HOOK_SRC" "$TARGET_DIR/backlog-commit-hook.sh"
-  chmod +x "$TARGET_DIR/backlog-commit-hook.sh"
-  ok "backlog-commit-hook.sh installed"
+if [ -f "$COMMIT_HOOK_SRC" ]; then
+  cp "$COMMIT_HOOK_SRC" "$SHARED_DIR/backlog-commit-hook.sh"
+  chmod +x "$SHARED_DIR/backlog-commit-hook.sh"
+  ok "backlog-commit-hook.sh installed to shared location"
+fi
+
+# -- mcp-local-rag dependency (shared) ---------------------------------------
+
+if [ "$UPDATE_MODE" = true ] || [ ! -f "$SHARED_DIR/node_modules/mcp-local-rag/package.json" ]; then
+  info "Installing mcp-local-rag to shared location..."
+  if [ ! -f "$SHARED_DIR/package.json" ]; then
+    (cd "$SHARED_DIR" && npm init -y --silent 2>/dev/null)
+  fi
+  (cd "$SHARED_DIR" && npm install mcp-local-rag --save --silent 2>/dev/null)
+  ok "mcp-local-rag installed (shared)"
+else
+  ok "mcp-local-rag already installed (shared)"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Migrate per-project copies to shared location
+# ─────────────────────────────────────────────────────────────────────────────
+
+MIGRATION_DONE=false
+
+if [ "$SELF_INSTALL" = false ] && [ -f "$TARGET_DIR/lib/rag-server.mjs" ]; then
+  info "Migrating from per-project lib/ to shared location..."
+  rm -rf "$TARGET_DIR/lib"
+  ok "Removed $TARGET_DIR/lib/ (now at $SHARED_DIR/lib/)"
+  MIGRATION_DONE=true
+fi
+
+if [ "$SELF_INSTALL" = false ] && [ -f "$TARGET_DIR/backlog-commit-hook.sh" ]; then
+  rm -f "$TARGET_DIR/backlog-commit-hook.sh"
+  ok "Removed per-project backlog-commit-hook.sh (now at $SHARED_DIR/)"
+  MIGRATION_DONE=true
+fi
+
+if [ "$SELF_INSTALL" = false ] && [ -d "$TARGET_DIR/node_modules/mcp-local-rag" ]; then
+  info "Removing per-project mcp-local-rag (now in shared location)..."
+  (cd "$TARGET_DIR" && npm uninstall mcp-local-rag --save --silent 2>/dev/null) || true
+  ok "Removed per-project mcp-local-rag dependency"
+  MIGRATION_DONE=true
+fi
+
+if [ "$MIGRATION_DONE" = true ]; then
+  UPDATE_MODE=true
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -537,14 +559,14 @@ else
 {
   "backlog": {
     "command": "node",
-    "args": ["$TARGET_DIR/lib/backlog-proxy.mjs"],
+    "args": ["$SHARED_DIR/lib/backlog-proxy.mjs"],
     "env": {
       "BACKLOG_CWD": "$TARGET_DIR"
     }
   },
   "backlog-rag": {
     "command": "node",
-    "args": ["$TARGET_DIR/lib/rag-server.mjs"],
+    "args": ["$SHARED_DIR/lib/rag-server.mjs"],
     "env": {
       "BASE_DIR": "$TARGET_DIR/backlog",
       "DB_PATH": "$TARGET_DIR/.lancedb",
@@ -583,7 +605,7 @@ else
 {
   "backlog": {
     "type": "local",
-    "command": ["node", "$TARGET_DIR/lib/backlog-proxy.mjs"],
+    "command": ["node", "$SHARED_DIR/lib/backlog-proxy.mjs"],
     "environment": {
       "BACKLOG_CWD": "$TARGET_DIR"
     },
@@ -591,7 +613,7 @@ else
   },
   "backlog-rag": {
     "type": "local",
-    "command": ["node", "$TARGET_DIR/lib/rag-server.mjs"],
+    "command": ["node", "$SHARED_DIR/lib/rag-server.mjs"],
     "environment": {
       "BASE_DIR": "$TARGET_DIR/backlog",
       "DB_PATH": "$TARGET_DIR/.lancedb",
@@ -734,6 +756,7 @@ if [ -d "$CACHE_DIR_VALUE/Xenova" ]; then
   ok "Embedding model already cached ($CACHE_DIR_VALUE)"
 else
   info "Pre-downloading embedding model (~90MB, one-time) to $CACHE_DIR_VALUE..."
+  (cd "$SHARED_DIR" && \
   BASE_DIR="$TARGET_DIR/backlog" \
   DB_PATH="$TARGET_DIR/.lancedb" \
   CACHE_DIR="$CACHE_DIR_VALUE" \
@@ -750,7 +773,7 @@ else
       console.log('Model cache ready');
       process.exit(0);
     }).catch(e => { console.error(e.message); process.exit(0); });
-  " 2>/dev/null || warn "Model pre-download skipped (will download on first use)"
+  " 2>/dev/null) || warn "Model pre-download skipped (will download on first use)"
   ok "Embedding model cached at $CACHE_DIR_VALUE"
 fi
 
@@ -765,14 +788,17 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo ""
 echo "  Files created:"
 echo "    backlog/                 — kanban board data (tasks, docs, milestones)"
-echo "    lib/                     — modular RAG server (6 modules)"
-echo "    backlog-commit-hook.sh   — auto-commit after task operations"
 if [ "$EDITOR_CONFIG" = "all" ] || [ "$EDITOR_CONFIG" = "claude" ]; then
 echo "    .mcp.json                — MCP config for Claude Code / Cursor"
 fi
 if [ "$EDITOR_CONFIG" = "all" ] || [ "$EDITOR_CONFIG" = "opencode" ]; then
 echo "    opencode.json            — MCP config for OpenCode"
 fi
+echo ""
+echo "  Shared install ($SHARED_DIR):"
+echo "    lib/                     — modular RAG server (8 modules)"
+echo "    backlog-commit-hook.sh   — auto-commit after task operations"
+echo "    node_modules/            — mcp-local-rag dependency"
 if [ "$SUBMODULE_MODE" = true ]; then
 echo ""
 echo "  Submodule mode:"
