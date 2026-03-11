@@ -7,14 +7,17 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, "..");
 
 // ---------------------------------------------------------------------------
-// The 4 workflow guide tools that the proxy should intercept
+// The 4 workflow guide tools that the proxy should intercept.
+// These are the UPSTREAM MCP tool names (no "backlog_" prefix).
+// MCP clients (OpenCode, Claude Code) add the server-name prefix for
+// disambiguation, but the proxy sees the raw names.
 // ---------------------------------------------------------------------------
 
 const WORKFLOW_GUIDE_TOOLS = [
-  "backlog_get_workflow_overview",
-  "backlog_get_task_creation_guide",
-  "backlog_get_task_execution_guide",
-  "backlog_get_task_finalization_guide",
+  "get_workflow_overview",
+  "get_task_creation_guide",
+  "get_task_execution_guide",
+  "get_task_finalization_guide",
 ];
 
 // ---------------------------------------------------------------------------
@@ -93,11 +96,11 @@ describe("backlog-proxy — guide override lookup", () => {
   it("returns null for non-guide tools", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     const nonGuideTools = [
-      "backlog_task_create",
-      "backlog_task_edit",
-      "backlog_task_list",
-      "backlog_task_view",
-      "backlog_semantic_search",
+      "task_create",
+      "task_edit",
+      "task_list",
+      "task_view",
+      "semantic_search",
     ];
     for (const toolName of nonGuideTools) {
       const result = proxy.getGuideOverride(toolName);
@@ -130,7 +133,7 @@ describe("backlog-proxy — guide content quality", () => {
 
   it("finalization guide override mentions backlog_task_complete", async () => {
     proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
-    const content = proxy.getGuideOverride("backlog_get_task_finalization_guide");
+    const content = proxy.getGuideOverride("get_task_finalization_guide");
     assert.ok(
       content.includes("backlog_task_complete"),
       "Finalization guide override should mention backlog_task_complete"
@@ -139,7 +142,7 @@ describe("backlog-proxy — guide content quality", () => {
 
   it("finalization guide override warns against backlog_task_edit for Done", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
-    const content = proxy.getGuideOverride("backlog_get_task_finalization_guide");
+    const content = proxy.getGuideOverride("get_task_finalization_guide");
     // Should warn against using status: Done via edit
     assert.ok(
       /backlog_task_edit.*Done|status.*Done.*backlog_task_edit/i.test(content) ||
@@ -152,7 +155,7 @@ describe("backlog-proxy — guide content quality", () => {
 
   it("workflow overview override mentions backlog_task_complete", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
-    const content = proxy.getGuideOverride("backlog_get_workflow_overview");
+    const content = proxy.getGuideOverride("get_workflow_overview");
     assert.ok(
       content.includes("backlog_task_complete"),
       "Workflow overview override should mention backlog_task_complete"
@@ -167,10 +170,10 @@ describe("backlog-proxy — guide content quality", () => {
 describe("backlog-proxy — isDoneViaEdit", () => {
   let proxy;
 
-  it("detects status='Done' on backlog_task_edit", async () => {
+  it("detects status='Done' on task_edit", async () => {
     proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     assert.equal(
-      proxy.isDoneViaEdit("backlog_task_edit", { id: "TASK-1", status: "Done" }),
+      proxy.isDoneViaEdit("task_edit", { id: "TASK-1", status: "Done" }),
       true
     );
   });
@@ -179,7 +182,7 @@ describe("backlog-proxy — isDoneViaEdit", () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     for (const variant of ["done", "DONE", "Done", " Done ", " done "]) {
       assert.equal(
-        proxy.isDoneViaEdit("backlog_task_edit", { id: "TASK-1", status: variant }),
+        proxy.isDoneViaEdit("task_edit", { id: "TASK-1", status: variant }),
         true,
         `Should detect status="${variant}"`
       );
@@ -190,7 +193,7 @@ describe("backlog-proxy — isDoneViaEdit", () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     for (const status of ["To Do", "In Progress", "Draft"]) {
       assert.equal(
-        proxy.isDoneViaEdit("backlog_task_edit", { id: "TASK-1", status }),
+        proxy.isDoneViaEdit("task_edit", { id: "TASK-1", status }),
         false,
         `Should not block status="${status}"`
       );
@@ -200,26 +203,26 @@ describe("backlog-proxy — isDoneViaEdit", () => {
   it("returns false for other tool names", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     assert.equal(
-      proxy.isDoneViaEdit("backlog_task_create", { status: "Done" }),
+      proxy.isDoneViaEdit("task_create", { status: "Done" }),
       false
     );
     assert.equal(
-      proxy.isDoneViaEdit("backlog_task_complete", { id: "TASK-1" }),
+      proxy.isDoneViaEdit("task_complete", { id: "TASK-1" }),
       false
     );
   });
 
   it("returns false for missing or null args", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
-    assert.equal(proxy.isDoneViaEdit("backlog_task_edit", null), false);
-    assert.equal(proxy.isDoneViaEdit("backlog_task_edit", undefined), false);
-    assert.equal(proxy.isDoneViaEdit("backlog_task_edit", {}), false);
+    assert.equal(proxy.isDoneViaEdit("task_edit", null), false);
+    assert.equal(proxy.isDoneViaEdit("task_edit", undefined), false);
+    assert.equal(proxy.isDoneViaEdit("task_edit", {}), false);
   });
 
   it("returns false when status is not a string", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     assert.equal(
-      proxy.isDoneViaEdit("backlog_task_edit", { id: "TASK-1", status: 42 }),
+      proxy.isDoneViaEdit("task_edit", { id: "TASK-1", status: 42 }),
       false
     );
   });
@@ -237,7 +240,7 @@ describe("backlog-proxy — rewriteToolList", () => {
     return {
       tools: [
         {
-          name: "backlog_task_edit",
+          name: "task_edit",
           description: "Edit a task",
           inputSchema: {
             properties: {
@@ -251,12 +254,12 @@ describe("backlog-proxy — rewriteToolList", () => {
           },
         },
         {
-          name: "backlog_task_complete",
+          name: "task_complete",
           description: "Complete a task",
           inputSchema: { properties: { id: { type: "string" } } },
         },
         {
-          name: "backlog_task_list",
+          name: "task_list",
           description: "List tasks",
           inputSchema: { properties: {} },
         },
@@ -264,10 +267,10 @@ describe("backlog-proxy — rewriteToolList", () => {
     };
   }
 
-  it("removes Done from backlog_task_edit status enum", async () => {
+  it("removes Done from task_edit status enum", async () => {
     proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     const result = proxy.rewriteToolList(fakeToolList());
-    const editTool = result.tools.find((t) => t.name === "backlog_task_edit");
+    const editTool = result.tools.find((t) => t.name === "task_edit");
     const statusEnum = editTool.inputSchema.properties.status.enum;
     assert.ok(
       !statusEnum.some((v) => v.toLowerCase() === "done"),
@@ -278,34 +281,34 @@ describe("backlog-proxy — rewriteToolList", () => {
   it("preserves other status values in the enum", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     const result = proxy.rewriteToolList(fakeToolList());
-    const editTool = result.tools.find((t) => t.name === "backlog_task_edit");
+    const editTool = result.tools.find((t) => t.name === "task_edit");
     const statusEnum = editTool.inputSchema.properties.status.enum;
     assert.ok(statusEnum.includes("Draft"));
     assert.ok(statusEnum.includes("To Do"));
     assert.ok(statusEnum.includes("In Progress"));
   });
 
-  it("appends warning to backlog_task_edit status description", async () => {
+  it("appends warning to task_edit status description", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     const result = proxy.rewriteToolList(fakeToolList());
-    const editTool = result.tools.find((t) => t.name === "backlog_task_edit");
+    const editTool = result.tools.find((t) => t.name === "task_edit");
     const desc = editTool.inputSchema.properties.status.description;
     assert.ok(
-      desc.includes("backlog_task_complete"),
-      `Status description should mention backlog_task_complete, got: "${desc}"`
+      desc.includes("task_complete"),
+      `Status description should mention task_complete, got: "${desc}"`
     );
   });
 
-  it("enhances backlog_task_complete description", async () => {
+  it("enhances task_complete description", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     const result = proxy.rewriteToolList(fakeToolList());
-    const completeTool = result.tools.find((t) => t.name === "backlog_task_complete");
+    const completeTool = result.tools.find((t) => t.name === "task_complete");
     assert.ok(
       completeTool.description.includes("REQUIRED"),
       `Complete tool description should include REQUIRED, got: "${completeTool.description}"`
     );
     assert.ok(
-      completeTool.description.includes("backlog_task_edit"),
+      completeTool.description.includes("task_edit"),
       "Complete tool description should warn against task_edit"
     );
   });
@@ -325,7 +328,7 @@ describe("backlog-proxy — rewriteToolList", () => {
   it("leaves unrelated tools unchanged", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     const result = proxy.rewriteToolList(fakeToolList());
-    const listTool = result.tools.find((t) => t.name === "backlog_task_list");
+    const listTool = result.tools.find((t) => t.name === "task_list");
     assert.equal(listTool.description, "List tasks");
   });
 
@@ -341,8 +344,8 @@ describe("backlog-proxy — rewriteToolList", () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     const list = {
       tools: [
-        { name: "backlog_task_edit", description: "Edit" },
-        { name: "backlog_task_complete", description: "Complete" },
+        { name: "task_edit", description: "Edit" },
+        { name: "task_complete", description: "Complete" },
       ],
     };
     // Should not throw
@@ -354,8 +357,8 @@ describe("backlog-proxy — rewriteToolList", () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
     const first = proxy.rewriteToolList(fakeToolList());
     const second = proxy.rewriteToolList(first);
-    const editFirst = first.tools.find((t) => t.name === "backlog_task_edit");
-    const editSecond = second.tools.find((t) => t.name === "backlog_task_edit");
+    const editFirst = first.tools.find((t) => t.name === "task_edit");
+    const editSecond = second.tools.find((t) => t.name === "task_edit");
     assert.deepEqual(
       editFirst.inputSchema.properties.status.enum,
       editSecond.inputSchema.properties.status.enum
@@ -364,8 +367,8 @@ describe("backlog-proxy — rewriteToolList", () => {
       editFirst.inputSchema.properties.status.description,
       editSecond.inputSchema.properties.status.description
     );
-    const completeFirst = first.tools.find((t) => t.name === "backlog_task_complete");
-    const completeSecond = second.tools.find((t) => t.name === "backlog_task_complete");
+    const completeFirst = first.tools.find((t) => t.name === "task_complete");
+    const completeSecond = second.tools.find((t) => t.name === "task_complete");
     assert.equal(completeFirst.description, completeSecond.description);
   });
 });
@@ -393,7 +396,7 @@ describe("backlog-proxy — tool dispatching", () => {
     const mockClient = { callTool: clientCallTool };
 
     const handler = proxy.createToolHandler(mockClient);
-    const result = await handler("backlog_get_task_finalization_guide", {});
+    const result = await handler("get_task_finalization_guide", {});
 
     // Should NOT have called the real client
     assert.equal(clientCallTool.mock.callCount(), 0, "Should not forward intercepted tools to client");
@@ -419,44 +422,71 @@ describe("backlog-proxy — tool dispatching", () => {
     const mockClient = { callTool: clientCallTool };
 
     const handler = proxy.createToolHandler(mockClient);
-    const result = await handler("backlog_task_list", { status: "To Do" });
+    const result = await handler("task_list", { status: "To Do" });
 
     assert.equal(clientCallTool.mock.callCount(), 1, "Should forward to client");
     assert.deepEqual(
       clientCallTool.mock.calls[0].arguments,
-      [{ name: "backlog_task_list", arguments: { status: "To Do" } }],
+      [{ name: "task_list", arguments: { status: "To Do" } }],
       "Should forward tool name and arguments"
     );
     assert.equal(result.content[0].text, "real response");
   });
 
-  it("handler blocks backlog_task_edit with status Done", async () => {
+  it("handler auto-chains task_edit with status Done into task_complete", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
 
-    const clientCallTool = mock.fn(() => ({
-      content: [{ type: "text", text: "should not reach" }],
-    }));
+    const clientCallTool = mock.fn((opts) => {
+      if (opts.name === "task_edit") {
+        return { content: [{ type: "text", text: "status updated" }] };
+      }
+      if (opts.name === "task_complete") {
+        return { content: [{ type: "text", text: "task completed" }] };
+      }
+      return { content: [{ type: "text", text: "unexpected" }] };
+    });
     const mockClient = { callTool: clientCallTool };
 
     const handler = proxy.createToolHandler(mockClient);
-    const result = await handler("backlog_task_edit", {
+    const result = await handler("task_edit", {
       id: "TASK-1",
       status: "Done",
     });
 
+    // Should have called BOTH task_edit and task_complete
     assert.equal(
       clientCallTool.mock.callCount(),
-      0,
-      "Should NOT forward backlog_task_edit with status Done"
+      2,
+      "Should call task_edit then task_complete"
     );
-    assert.ok(result.isError, "Result should be marked as error");
+    assert.equal(
+      clientCallTool.mock.calls[0].arguments[0].name,
+      "task_edit",
+      "First call should be task_edit"
+    );
+    assert.equal(
+      clientCallTool.mock.calls[1].arguments[0].name,
+      "task_complete",
+      "Second call should be task_complete"
+    );
+    assert.deepEqual(
+      clientCallTool.mock.calls[1].arguments[0].arguments,
+      { id: "TASK-1" },
+      "task_complete should receive the task id"
+    );
+
+    // Result should include the notice
     assert.ok(
-      result.content[0].text.includes("backlog_task_complete"),
-      "Error message should mention backlog_task_complete"
+      result.content[0].text.includes("automatically upgraded"),
+      "Result should include upgrade notice"
+    );
+    assert.ok(
+      !result.isError,
+      "Result should NOT be an error (auto-chain succeeds)"
     );
   });
 
-  it("handler allows backlog_task_edit with non-Done status", async () => {
+  it("handler allows task_edit with non-Done status", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
 
     const clientCallTool = mock.fn(() => ({
@@ -465,7 +495,7 @@ describe("backlog-proxy — tool dispatching", () => {
     const mockClient = { callTool: clientCallTool };
 
     const handler = proxy.createToolHandler(mockClient);
-    const result = await handler("backlog_task_edit", {
+    const result = await handler("task_edit", {
       id: "TASK-1",
       status: "In Progress",
     });
@@ -474,7 +504,7 @@ describe("backlog-proxy — tool dispatching", () => {
     assert.equal(result.content[0].text, "edit succeeded");
   });
 
-  it("handler allows backlog_task_edit without status field", async () => {
+  it("handler allows task_edit without status field", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
 
     const clientCallTool = mock.fn(() => ({
@@ -483,7 +513,7 @@ describe("backlog-proxy — tool dispatching", () => {
     const mockClient = { callTool: clientCallTool };
 
     const handler = proxy.createToolHandler(mockClient);
-    const result = await handler("backlog_task_edit", {
+    const result = await handler("task_edit", {
       id: "TASK-1",
       title: "New title",
     });
