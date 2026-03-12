@@ -4,6 +4,7 @@ import {
   globToRegex,
   isExcluded,
   escapeRegex,
+  normalizePath,
   DEFAULT_EXCLUDE_PATTERNS,
 } from "../lib/exclusion.mjs";
 
@@ -300,5 +301,79 @@ describe("DEFAULT_EXCLUDE_PATTERNS", () => {
 
   it("has exactly 8 default patterns", () => {
     assert.equal(DEFAULT_EXCLUDE_PATTERNS.length, 8);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// normalizePath — backslash-to-forward-slash conversion
+// ---------------------------------------------------------------------------
+
+describe("normalizePath", () => {
+  it("converts backslashes to forward slashes", () => {
+    assert.equal(normalizePath("src\\lib\\file.mjs"), "src/lib/file.mjs");
+  });
+
+  it("leaves forward slashes unchanged", () => {
+    assert.equal(normalizePath("src/lib/file.mjs"), "src/lib/file.mjs");
+  });
+
+  it("handles mixed separators", () => {
+    assert.equal(normalizePath("src\\lib/mixed\\path"), "src/lib/mixed/path");
+  });
+
+  it("handles empty string", () => {
+    assert.equal(normalizePath(""), "");
+  });
+
+  it("handles root-only backslash", () => {
+    assert.equal(normalizePath("\\"), "/");
+  });
+
+  it("handles Windows-style relative paths", () => {
+    assert.equal(
+      normalizePath("tasks\\completed\\task-1.md"),
+      "tasks/completed/task-1.md"
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isExcluded — Windows path normalization (backslash paths)
+// ---------------------------------------------------------------------------
+
+describe("isExcluded — Windows backslash paths", () => {
+  const defaultMatchers = DEFAULT_EXCLUDE_PATTERNS.map(globToRegex);
+
+  it("excludes .git with backslash path", () => {
+    assert.ok(isExcluded(".git\\objects\\pack", defaultMatchers));
+  });
+
+  it("excludes node_modules with backslash path", () => {
+    assert.ok(isExcluded("packages\\app\\node_modules", defaultMatchers));
+    assert.ok(isExcluded("packages\\app\\node_modules\\foo", defaultMatchers));
+  });
+
+  it("excludes .DS_Store with backslash path", () => {
+    assert.ok(isExcluded("subdir\\.DS_Store", defaultMatchers));
+  });
+
+  it("excludes completed with backslash path", () => {
+    assert.ok(isExcluded("tasks\\completed\\task-1.md", defaultMatchers));
+  });
+
+  it("excludes archive with backslash path", () => {
+    assert.ok(isExcluded("tasks\\archive\\task-1.md", defaultMatchers));
+  });
+
+  it("does not exclude normal project files with backslash path", () => {
+    assert.ok(!isExcluded("src\\index.js", defaultMatchers));
+    assert.ok(!isExcluded("backlog\\tasks\\task-1.md", defaultMatchers));
+  });
+
+  it("works with custom glob matchers and backslash paths", () => {
+    const matchers = [globToRegex("*.log"), globToRegex("dist")];
+    assert.ok(isExcluded("sub\\debug.log", matchers));
+    assert.ok(isExcluded("dist\\bundle.js", matchers));
+    assert.ok(!isExcluded("src\\index.js", matchers));
   });
 });

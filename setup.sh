@@ -468,7 +468,7 @@ fi
 
 LIB_SRC_DIR="$SCRIPT_DIR/lib"
 REPO_RAW="https://raw.githubusercontent.com/Hodnebo/backlog-setup/main"
-LIB_FILES="rag-server.mjs preprocessing.mjs exclusion.mjs discovery.mjs hashing.mjs ingestion.mjs workflow-guides.mjs backlog-proxy.mjs"
+LIB_FILES="rag-server.mjs preprocessing.mjs exclusion.mjs discovery.mjs hashing.mjs ingestion.mjs workflow-guides.mjs backlog-proxy.mjs backlog-commit-hook.mjs platform.mjs"
 
 info "Shared install location: $SHARED_DIR"
 

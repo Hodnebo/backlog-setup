@@ -19,6 +19,8 @@ Combines [Backlog.md](https://github.com/MrLesk/Backlog.md) (markdown kanban + M
 
 ## Quick start
 
+### macOS / Linux
+
 ```bash
 curl -LsSf https://raw.githubusercontent.com/Hodnebo/backlog-setup/main/install.sh | bash -s -- /path/to/your/project
 ```
@@ -30,26 +32,39 @@ git clone https://github.com/Hodnebo/backlog-setup.git ~/backlog-setup
 ~/backlog-setup/setup.sh /path/to/your/project
 ```
 
+### Windows
+
+```powershell
+git clone https://github.com/Hodnebo/backlog-setup.git $HOME\backlog-setup
+node $HOME\backlog-setup\setup.mjs C:\path\to\your\project
+```
+
+### Options
+
 To use a per-repo model cache instead of the shared one:
 
 ```bash
+# macOS/Linux
 ~/backlog-setup/setup.sh --local-cache /path/to/your/project
+
+# Windows
+node $HOME\backlog-setup\setup.mjs --local-cache C:\path\to\your\project
 ```
 
 That's it. Open the project in OpenCode, Claude Code, or Cursor — both MCP servers start automatically.
 
 ### Updating existing installations
 
-Re-running `setup.sh` always refreshes the shared install (`~/.local/share/backlog-setup/`), so all projects get updated lib/ code automatically. To also refresh per-project MCP configs and the AGENTS.md workflow section:
+Re-running the installer always refreshes the shared install, so all projects get updated lib/ code automatically. To also refresh per-project MCP configs and the AGENTS.md workflow section:
 
 ```bash
+# macOS/Linux
 curl -LsSf https://raw.githubusercontent.com/Hodnebo/backlog-setup/main/install.sh | bash -s -- --update /path/to/your/project
-```
-
-Or from a local clone:
-
-```bash
+# or from a local clone:
 ~/backlog-setup/setup.sh --update /path/to/your/project
+
+# Windows
+node $HOME\backlog-setup\setup.mjs --update C:\path\to\your\project
 ```
 
 This merges the latest backlog server configs into existing MCP files (preserving other servers) and refreshes the AGENTS.md workflow section. Without `--update`, existing per-project configs are skipped.
@@ -82,13 +97,15 @@ git push -u origin main
 
 Everything else works identically — MCP tools, semantic search, auto-commit all adapt to submodule mode automatically. For conversion from plain directory, cloning, and tradeoffs, see [docs/internals.md](docs/internals.md#submodule-mode-internals).
 
-## What setup.sh does
+## What the installer does
+
+Both `setup.sh` (macOS/Linux) and `setup.mjs` (Windows/cross-platform) perform the same steps:
 
 1. Checks Node.js 18+ and npm are available
 2. Installs `backlog.md` globally (if not already present)
 3. Runs `backlog init` with MCP integration mode
 4. If `--submodule`: wires `backlog/` as a git submodule (handles fresh init, conversion from plain dir, and fresh clones)
-5. Installs `lib/` modules, `backlog-commit-hook.sh`, and `mcp-local-rag` to `~/.local/share/backlog-setup/` (shared across all projects)
+5. Installs `lib/` modules, commit hooks, and `mcp-local-rag` to the shared install directory (platform-aware: `~/.local/share/backlog-setup/` on Unix, `%LOCALAPPDATA%\backlog-setup\` on Windows)
 6. Migrates any existing per-project `lib/` and `backlog-commit-hook.sh` to the shared location
 7. Installs the `backlog-semantic-search` skill to `.opencode/skills/`
 8. Writes `.mcp.json` (Claude Code / Cursor) and `opencode.json` (OpenCode) — pointing to the shared install
@@ -110,8 +127,8 @@ your-project/
   .lancedb/                 # Vector database (gitignored)
 
 ~/.local/share/backlog-setup/   # Shared install (one copy, all projects)
-  lib/                          # Modular RAG server + backlog proxy (8 modules)
-  backlog-commit-hook.sh        # Auto-commit hook
+  lib/                          # Modular RAG server + backlog proxy (10 modules)
+  backlog-commit-hook.sh        # Auto-commit hook (bash, backward compat)
   node_modules/                 # mcp-local-rag dependency
 
 ~/.mcp-local-rag-models/       # Shared embedding model cache (~97MB, one-time download)
@@ -159,11 +176,11 @@ The installed `backlog-semantic-search` skill teaches AI agents to prefer semant
 
 **Auto-ingestion** — `~/.local/share/backlog-setup/lib/rag-server.mjs` scans `backlog/` on startup, hashes files, and ingests new/changed ones into a local vector DB. A file watcher keeps everything in sync during long editor sessions.
 
-**Auto-commit** — after each file change, a git commit is scheduled with a 2-second debounce (so multi-field edits produce one commit). The hook script detects your git setup (submodule → commit + push, plain repo → commit only, no git → no-op). Disable with `BACKLOG_AUTO_COMMIT=false`.
+**Auto-commit** — after each file change, a git commit is scheduled with a 2-second debounce (so multi-field edits produce one commit). The Node.js commit hook (`lib/backlog-commit-hook.mjs`) detects your git setup (submodule → commit + push, plain repo → commit only, no git → no-op) and works on all platforms. Disable with `BACKLOG_AUTO_COMMIT=false`.
 
 **Semantic search** — queries go through local embeddings (Xenova/all-MiniLM-L6-v2) stored in `.lancedb/`. No API keys, fully offline.
 
-**Shared install** — all infrastructure (`lib/`, `backlog-commit-hook.sh`, `node_modules/`) lives in `~/.local/share/backlog-setup/`. MCP configs in each project reference this shared location. Updating backlog-setup once propagates to all projects.
+**Shared install** — all infrastructure (`lib/`, commit hooks, `node_modules/`) lives in a platform-specific shared directory (`~/.local/share/backlog-setup/` on Unix, `%LOCALAPPDATA%\backlog-setup\` on Windows). MCP configs in each project reference this shared location. Updating backlog-setup once propagates to all projects.
 
 For architecture diagrams, preprocessing details, benchmarks, and exclusion pattern syntax, see [docs/internals.md](docs/internals.md).
 
@@ -184,10 +201,29 @@ AI Editor (OpenCode / Claude Code / Cursor)
   '-- backlog-rag MCP server -- ~/.local/share/backlog-setup/lib/rag-server.mjs (stdio)
         |-- auto-ingest on startup
         |-- file watcher (live sync + auto-commit trigger)
-        |     '-- ~/.local/share/backlog-setup/backlog-commit-hook.sh
+        |     '-- lib/backlog-commit-hook.mjs (cross-platform)
         '-- backlog_semantic_search + 5 admin tools
               '-- .lancedb/ (LanceDB vector store)
 ```
+
+## Windows support
+
+Both the installer and the runtime work natively on Windows — no WSL, Git Bash, or MSYS2 required.
+
+| Component | macOS / Linux | Windows |
+|-----------|---------------|---------|
+| **Installer** | `setup.sh` (bash) | `setup.mjs` (Node.js) |
+| **Shared install** | `~/.local/share/backlog-setup/` | `%LOCALAPPDATA%\backlog-setup\` |
+| **Model cache** | `~/.mcp-local-rag-models/` | `%LOCALAPPDATA%\mcp-local-rag-models\` |
+| **Auto-commit** | `backlog-commit-hook.mjs` | `backlog-commit-hook.mjs` |
+| **MCP servers** | Identical (Node.js) | Identical (Node.js) |
+
+### Platform-specific notes
+
+- **Path separators**: All Node.js runtime code normalizes backslashes to forward slashes internally. MCP configs use forward slashes (Node.js accepts them on all platforms).
+- **Auto-commit**: The Node.js commit hook (`lib/backlog-commit-hook.mjs`) works on all platforms. The bash hook (`backlog-commit-hook.sh`) is still installed for backward compatibility on Unix.
+- **Exclusion patterns**: The `exclusion.mjs` module normalizes Windows backslash paths before matching, so gitignore-style patterns work identically on all platforms.
+- **`setup.mjs`** supports all the same flags as `setup.sh`: `--local-cache`, `--submodule`, `--backlog-remote`, `--update`, `--yes`.
 
 ## Customization
 

@@ -1,14 +1,15 @@
 # AGENTS.md — backlog-setup
 
-Setup/tooling repo (not an application). Three source areas: `setup.sh` (bash installer), `lib/` (Node.js ESM modules — RAG server wrapping mcp-local-rag, plus MCP proxy for backlog with corrected workflow guides), and `skills/` (installable AI agent skills). No build step, no linter, no CI.
+Setup/tooling repo (not an application). Three source areas: `setup.sh`/`setup.mjs` (bash and cross-platform Node.js installers), `lib/` (Node.js ESM modules — RAG server wrapping mcp-local-rag, plus MCP proxy for backlog with corrected workflow guides), and `skills/` (installable AI agent skills). No build step, no linter, no CI.
 
-`setup.sh` installs `lib/`, `backlog-commit-hook.sh`, and `mcp-local-rag` to `~/.local/share/backlog-setup/` (shared across all projects). Per-project files are just `backlog/`, MCP configs, and skills.
+The installers place `lib/`, commit hooks, and `mcp-local-rag` into a shared directory (`~/.local/share/backlog-setup/` on Unix, `%LOCALAPPDATA%\backlog-setup\` on Windows). Per-project files are just `backlog/`, MCP configs, and skills.
 
 ## Commands
 
 ```bash
 bash -n setup.sh                # Validate shell syntax
 ./setup.sh /path/to/target      # Run installer against a directory
+node setup.mjs /path/to/target  # Cross-platform installer (same as setup.sh)
 BASE_DIR=./backlog DB_PATH=./.lancedb CACHE_DIR=~/.mcp-local-rag-models node lib/rag-server.mjs
 node --test test/*.test.mjs     # Run unit tests
 ```
@@ -17,6 +18,7 @@ node --test test/*.test.mjs     # Run unit tests
 
 ```
 setup.sh                  # Bash installer — installs lib/ to ~/.local/share/backlog-setup/
+setup.mjs                 # Cross-platform Node.js installer (Windows + macOS + Linux)
 backlog-commit-hook.sh    # Auto-commit hook for task file changes
 lib/
   rag-server.mjs          # Entry point — env config, MCP server, file watcher, auto-commit
@@ -27,11 +29,14 @@ lib/
   ingestion.mjs           # File ingestion/removal with retry logic
   workflow-guides.mjs     # Corrected workflow guide text (backlog_task_complete)
   backlog-proxy.mjs       # MCP proxy — intercepts guide tools, forwards the rest
+  backlog-commit-hook.mjs # Cross-platform auto-commit hook (Node.js port)
+  platform.mjs            # Platform helpers (shared dir, cache dir, path utils)
 test/
   preprocessing.test.mjs  # Tests for preprocessing module
   exclusion.test.mjs      # Tests for exclusion module
   guidance.test.mjs       # Policy tests for workflow guidance text
   backlog-proxy.test.mjs  # Tests for MCP proxy module
+  platform.test.mjs       # Tests for platform helpers
   perf-test.mjs           # Precision/recall benchmark (50 tasks, 10 queries)
 skills/
   backlog-semantic-search.md  # Installed into target projects
