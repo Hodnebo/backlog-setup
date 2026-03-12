@@ -1,7 +1,7 @@
 ---
 id: TASK-35
 title: Publish to npm for universal npx install
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-03-12 13:10'
 updated_date: '2026-03-12 13:22'
