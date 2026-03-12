@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-03-12 08:52'
-updated_date: '2026-03-12 08:53'
+updated_date: '2026-03-12 09:22'
 labels:
   - bug
   - backlog-proxy
@@ -39,6 +39,8 @@ The proxy handles the wrong-tool case (`task_edit` with status "Done" → auto-c
 - [ ] #2 Calling `task_complete` on a task already in Done status still works (no double-edit)
 - [ ] #3 Test coverage for direct `task_complete` interception with non-Done status
 - [ ] #4 Existing auto-chain behavior for `task_edit(status=Done)` is preserved
+- [ ] #5 The `isDoneViaEdit` auto-chain is removed — `task_edit(status="Done")` returns a hard error (`DONE_VIA_EDIT_ERROR`)
+- [ ] #6 Tests for the old auto-chain behavior are updated to expect a hard error instead
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -51,4 +53,6 @@ The proxy handles the wrong-tool case (`task_edit` with status "Done" → auto-c
 `isDoneStatus()` does a substring match: `status.includes("done") || status.includes("complete")` — so any status containing those words passes.
 
 The fix in `createToolHandler()` should: detect `toolName === "task_complete"`, call `task_edit(id, status: "Done")` first, then forward to upstream `task_complete`. Should also handle the case where the task is already Done (skip the edit).
+
+**Scope addition:** Remove the `isDoneViaEdit` auto-chain in `createToolHandler()`. With "Done" already stripped from the `task_edit` enum and all guides warning against it, agents won't call this path. Replace with a hard error return (`DONE_VIA_EDIT_ERROR`). The `isDoneViaEdit()` detection function and `DONE_VIA_EDIT_ERROR` constant stay (used for the error), but `DONE_VIA_EDIT_NOTICE` and the two-call chain can go.
 <!-- SECTION:NOTES:END -->
