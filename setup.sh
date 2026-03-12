@@ -10,11 +10,10 @@ set -euo pipefail
 #   - MCP configs for OpenCode, Claude Code, and Cursor
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/<you>/backlog-setup/main/setup.sh | bash
-#   # or
-#   git clone <repo> /tmp/backlog-setup && /tmp/backlog-setup/setup.sh
-#   # or from within the backlog-setup repo:
-#   ./setup.sh /path/to/target/repo
+#   curl -LsSf https://raw.githubusercontent.com/Hodnebo/backlog-setup/main/install.sh | bash
+#   # or clone and run directly:
+#   git clone https://github.com/Hodnebo/backlog-setup.git ~/backlog-setup
+#   ~/backlog-setup/setup.sh /path/to/target/repo
 # ─────────────────────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

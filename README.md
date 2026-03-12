@@ -20,17 +20,13 @@ Combines [Backlog.md](https://github.com/MrLesk/Backlog.md) (markdown kanban + M
 ## Quick start
 
 ```bash
-# Clone this repo (or download setup.sh + lib/)
-git clone https://github.com/Hodnebo/backlog-setup.git ~/backlog-setup
-
-# Run in your target project
-cd /path/to/your/project
-~/backlog-setup/setup.sh
+curl -LsSf https://raw.githubusercontent.com/Hodnebo/backlog-setup/main/install.sh | bash -s -- /path/to/your/project
 ```
 
-Or point it at a directory:
+Or clone and run directly:
 
 ```bash
+git clone https://github.com/Hodnebo/backlog-setup.git ~/backlog-setup
 ~/backlog-setup/setup.sh /path/to/your/project
 ```
 
@@ -45,6 +41,12 @@ That's it. Open the project in OpenCode, Claude Code, or Cursor — both MCP ser
 ### Updating existing installations
 
 Re-running `setup.sh` always refreshes the shared install (`~/.local/share/backlog-setup/`), so all projects get updated lib/ code automatically. To also refresh per-project MCP configs and the AGENTS.md workflow section:
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/Hodnebo/backlog-setup/main/install.sh | bash -s -- --update /path/to/your/project
+```
+
+Or from a local clone:
 
 ```bash
 ~/backlog-setup/setup.sh --update /path/to/your/project
