@@ -1,7 +1,7 @@
 ---
 id: TASK-34
 title: Add Windows support
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-03-12 12:22'
 updated_date: '2026-03-12 12:50'
