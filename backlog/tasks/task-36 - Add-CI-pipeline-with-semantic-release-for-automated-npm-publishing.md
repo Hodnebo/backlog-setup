@@ -4,7 +4,7 @@ title: Add CI pipeline with semantic-release for automated npm publishing
 status: In Progress
 assignee: []
 created_date: '2026-03-12 13:26'
-updated_date: '2026-03-12 13:33'
+updated_date: '2026-03-12 13:46'
 labels:
   - ci
   - dx
@@ -63,12 +63,12 @@ Set up GitHub Actions CI that runs tests on PRs and auto-publishes to npm on mer
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 PRs run tests automatically via GitHub Actions
-- [ ] #2 Merging a feat: or fix: commit to main publishes a new version to npm automatically
-- [ ] #3 Changes only to backlog/ or docs do not trigger a release
-- [ ] #4 GitHub releases are created with auto-generated release notes
-- [ ] #5 Publishing uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret stored
-- [ ] #6 Published packages include provenance attestation (--provenance flag)
+- [x] #1 PRs run tests automatically via GitHub Actions
+- [x] #2 Merging a feat: or fix: commit to main publishes a new version to npm automatically
+- [x] #3 Changes only to backlog/ or docs do not trigger a release
+- [x] #4 GitHub releases are created with auto-generated release notes
+- [x] #5 Publishing uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret stored
+- [x] #6 Published packages include provenance attestation (--provenance flag)
 <!-- AC:END -->
 
 ## Implementation Notes
