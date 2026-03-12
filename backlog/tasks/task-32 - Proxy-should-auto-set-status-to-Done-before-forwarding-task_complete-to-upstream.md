@@ -3,10 +3,10 @@ id: TASK-32
 title: >-
   Proxy should auto-set status to Done before forwarding task_complete to
   upstream
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-03-12 08:52'
-updated_date: '2026-03-12 09:22'
+updated_date: '2026-03-12 10:09'
 labels:
   - bug
   - backlog-proxy
