@@ -3,7 +3,7 @@ id: TASK-32
 title: >-
   Proxy should auto-set status to Done before forwarding task_complete to
   upstream
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-03-12 08:52'
 updated_date: '2026-03-12 11:59'
