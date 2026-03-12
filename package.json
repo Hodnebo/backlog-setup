@@ -8,8 +8,7 @@
   "files": [
     "setup.mjs",
     "lib/",
-    "skills/",
-    "backlog-commit-hook.sh"
+    "skills/"
   ],
   "scripts": {
     "test": "node --test test/*.test.mjs"

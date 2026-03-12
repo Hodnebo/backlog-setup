@@ -13,7 +13,7 @@ AI Editor (OpenCode / Claude Code / Cursor)
   '-- backlog-rag MCP server -- rag-server.mjs (stdio)
         |-- auto-ingest on startup
         |-- file watcher (live sync + auto-commit trigger)
-        |     '-- backlog-commit-hook.sh (git add -> commit -> push)
+        |     '-- backlog-commit-hook.mjs (cross-platform)
         '-- backlog_semantic_search + 5 admin tools
               '-- .lancedb/ (LanceDB vector store)
 ```
@@ -31,7 +31,7 @@ Both servers communicate over stdio — no ports, no daemons, no background proc
 5. Removes deleted files from the vector index
 6. Starts a custom MCP server with backlog-named tools (`backlog_semantic_search`, etc.) over stdio
 7. **Starts a file watcher** on `BASE_DIR` — file changes are detected, debounced (300ms), and synced to the vector DB automatically
-8. **Triggers auto-commit** — after each successful ingest/remove, schedules a git commit (2s debounce) via `backlog-commit-hook.sh`
+8. **Triggers auto-commit** — after each successful ingest/remove, schedules a git commit (2s debounce) via `backlog-commit-hook.mjs`
 
 Cold start (model loading): ~15s. Warm start (no changes): instant. One new file: ~5s.
 
@@ -69,7 +69,7 @@ Multiple file changes within a **2-second window** are batched into a single com
 
 ### Git mode detection
 
-The hook script (`backlog-commit-hook.sh`) detects how `backlog/` is set up and commits accordingly:
+The commit hook (`lib/backlog-commit-hook.mjs`) detects how `backlog/` is set up and commits accordingly:
 
 | Git mode | Detection | Behavior |
 |----------|-----------|----------|
@@ -175,7 +175,7 @@ Each `backlog_semantic_search` call returns relevant results in ~956 tokens — 
 If you already ran setup without `--submodule` and want to convert, just re-run with the flag:
 
 ```bash
-~/backlog-setup/setup.sh --submodule --backlog-remote <url> /path/to/project
+npx backlog-setup --submodule --backlog-remote <url> /path/to/project
 ```
 
 The script detects the existing `backlog/` directory, converts it to a submodule, and preserves all task files.
@@ -188,4 +188,4 @@ git clone --recursive <project-url>
 git submodule update --init
 ```
 
-`setup.sh --submodule` also handles this automatically — if `.gitmodules` references backlog but it isn't initialized, it runs `git submodule update --init`.
+`npx backlog-setup --submodule` also handles this automatically — if `.gitmodules` references backlog but it isn't initialized, it runs `git submodule update --init`.

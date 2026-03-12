@@ -1,15 +1,13 @@
 # AGENTS.md — backlog-setup
 
-Setup/tooling repo (not an application). Three source areas: `setup.sh`/`setup.mjs` (bash and cross-platform Node.js installers), `lib/` (Node.js ESM modules — RAG server wrapping mcp-local-rag, plus MCP proxy for backlog with corrected workflow guides), and `skills/` (installable AI agent skills). No build step, no linter, no CI.
+Setup/tooling repo (not an application). Two source areas: `setup.mjs` (cross-platform Node.js installer), `lib/` (Node.js ESM modules — RAG server wrapping mcp-local-rag, plus MCP proxy for backlog with corrected workflow guides), and `skills/` (installable AI agent skills). No build step, no linter, no CI.
 
 The installers place `lib/`, commit hooks, and `mcp-local-rag` into a shared directory (`~/.local/share/backlog-setup/` on Unix, `%LOCALAPPDATA%\backlog-setup\` on Windows). Per-project files are just `backlog/`, MCP configs, and skills.
 
 ## Commands
 
 ```bash
-bash -n setup.sh                # Validate shell syntax
-./setup.sh /path/to/target      # Run installer against a directory
-node setup.mjs /path/to/target  # Cross-platform installer (same as setup.sh)
+node setup.mjs /path/to/target  # Cross-platform installer
 BASE_DIR=./backlog DB_PATH=./.lancedb CACHE_DIR=~/.mcp-local-rag-models node lib/rag-server.mjs
 node --test test/*.test.mjs     # Run unit tests
 ```
@@ -17,9 +15,7 @@ node --test test/*.test.mjs     # Run unit tests
 ## Project structure
 
 ```
-setup.sh                  # Bash installer — installs lib/ to ~/.local/share/backlog-setup/
 setup.mjs                 # Cross-platform Node.js installer (Windows + macOS + Linux)
-backlog-commit-hook.sh    # Auto-commit hook for task file changes
 lib/
   rag-server.mjs          # Entry point — env config, MCP server, file watcher, auto-commit
   preprocessing.mjs       # Backlog task detection and text preprocessing
@@ -43,8 +39,6 @@ skills/
 ```
 
 ## Code style
-
-**Shell** — `set -euo pipefail`. UPPER_SNAKE_CASE vars, always double-quoted. Sections separated by 77-char `# ────` bars. Idempotent: check-then-act. Log helpers: `info`/`ok`/`warn`/`fail`. Non-fatal errors use `|| true`.
 
 **JavaScript** — ESM via `.mjs` extension (package.json is `"type": "commonjs"`). `node:` protocol imports. 2-space indent, semicolons. `camelCase` locals, `UPPER_SNAKE_CASE` constants. Named function declarations at top level, arrows only inline. All logging to `process.stderr` (stdout reserved for MCP stdio). Top-level await. No TypeScript.
 

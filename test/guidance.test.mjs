@@ -11,30 +11,30 @@ const ROOT = join(__dirname, "..");
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Extract all AGENTS.md heredoc blocks from setup.sh content. */
+/** Extract the AGENTS_WORKFLOW template string from setup.mjs content. */
 function extractAgentsTemplate(setupContent) {
-  const blocks = setupContent.match(
-    /cat >> AGENTS\.md <<'AGENTSEOF'([\s\S]*?)AGENTSEOF/g
+  const match = setupContent.match(
+    /const AGENTS_WORKFLOW = `([\s\S]*?)`;/
   );
-  return blocks ? blocks.join("\n") : "";
+  return match ? match[1] : "";
 }
 
 // ---------------------------------------------------------------------------
-// setup.sh — AGENTS.md template
+// setup.mjs — AGENTS.md template
 // ---------------------------------------------------------------------------
 
-describe("guidance policy — setup.sh AGENTS.md template", () => {
+describe("guidance policy — setup.mjs AGENTS.md template", () => {
   let template;
 
-  it("loads the AGENTS.md template from setup.sh", async () => {
-    const content = await readFile(join(ROOT, "setup.sh"), "utf-8");
+  it("loads the AGENTS.md template from setup.mjs", async () => {
+    const content = await readFile(join(ROOT, "setup.mjs"), "utf-8");
     template = extractAgentsTemplate(content);
-    assert.ok(template.length > 0, "Should find AGENTS.md template in setup.sh");
+    assert.ok(template.length > 0, "Should find AGENTS_WORKFLOW template in setup.mjs");
   });
 
   it("mentions backlog_task_complete for finishing tasks", async () => {
     if (!template) {
-      const content = await readFile(join(ROOT, "setup.sh"), "utf-8");
+      const content = await readFile(join(ROOT, "setup.mjs"), "utf-8");
       template = extractAgentsTemplate(content);
     }
     assert.ok(
@@ -45,7 +45,7 @@ describe("guidance policy — setup.sh AGENTS.md template", () => {
 
   it("does NOT instruct backlog_task_edit for task completion", async () => {
     if (!template) {
-      const content = await readFile(join(ROOT, "setup.sh"), "utf-8");
+      const content = await readFile(join(ROOT, "setup.mjs"), "utf-8");
       template = extractAgentsTemplate(content);
     }
     assert.ok(

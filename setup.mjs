@@ -3,7 +3,7 @@
 /**
  * setup.mjs — Cross-platform Node.js installer for backlog-setup.
  *
- * Equivalent to setup.sh but works on Windows, macOS, and Linux.
+ * Cross-platform installer — works on Windows, macOS, and Linux.
  * Uses only node: built-in modules (no third-party dependencies).
  *
  * Usage:
@@ -692,27 +692,6 @@ if (existsSync(libSrcDir)) {
 }
 ok(`lib/ modules installed to shared location (${LIB_FILES.length} files)`);
 
-// -- backlog-commit-hook.sh (bash, backward compat) -------------------------
-
-const commitHookShSrc = join(SCRIPT_DIR, "backlog-commit-hook.sh");
-const commitHookShDest = join(SHARED_DIR, "backlog-commit-hook.sh");
-
-if (existsSync(commitHookShSrc)) {
-  cpSync(commitHookShSrc, commitHookShDest);
-  chmodExecutable(commitHookShDest);
-  ok("backlog-commit-hook.sh installed to shared location");
-} else {
-  const downloaded = await downloadFile(`${REPO_RAW}/backlog-commit-hook.sh`, commitHookShDest);
-  if (downloaded) {
-    chmodExecutable(commitHookShDest);
-    ok("backlog-commit-hook.sh installed to shared location");
-  } else {
-    warn("Could not download backlog-commit-hook.sh — auto-commit may use .mjs only");
-  }
-}
-
-// -- backlog-commit-hook.mjs is already in LIB_FILES (installed above) ------
-
 // -- mcp-local-rag dependency (shared) --------------------------------------
 
 const mcpLocalRagPkg = join(SHARED_DIR, "node_modules", "mcp-local-rag", "package.json");
@@ -738,12 +717,6 @@ if (!SELF_INSTALL && existsSync(join(targetDir, "lib", "rag-server.mjs"))) {
   info("Migrating from per-project lib/ to shared location...");
   rmSync(join(targetDir, "lib"), { recursive: true, force: true });
   ok(`Removed ${targetDir}/lib/ (now at ${SHARED_DIR}/lib/)`);
-  migrationDone = true;
-}
-
-if (!SELF_INSTALL && existsSync(join(targetDir, "backlog-commit-hook.sh"))) {
-  rmSync(join(targetDir, "backlog-commit-hook.sh"), { force: true });
-  ok(`Removed per-project backlog-commit-hook.sh (now at ${SHARED_DIR}/)`);
   migrationDone = true;
 }
 
@@ -1040,7 +1013,6 @@ if (editorConfig === "all" || editorConfig === "opencode") {
 process.stderr.write(`
   Shared install (${SHARED_DIR}):
     lib/                     — modular RAG server (${LIB_FILES.length} modules)
-    backlog-commit-hook.sh   — auto-commit after task operations
     node_modules/            — mcp-local-rag dependency
 `);
 if (submoduleMode) {

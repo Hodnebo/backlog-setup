@@ -50,7 +50,7 @@ graph TB
             FSWatch["fs.watch<br/>(recursive, debounced)"]
             PreProcess["Backlog task?<br/><i>preprocessing.mjs</i>"]
             IngestOrRemove["Ingest / Remove<br/>from vector DB"]
-            AutoCommit["Schedule auto-commit<br/><i>backlog-commit-hook.sh</i><br/>(2s debounce)"]
+            AutoCommit["Schedule auto-commit<br/><i>backlog-commit-hook.mjs</i><br/>(2s debounce)"]
         end
     end
 
@@ -60,7 +60,7 @@ graph TB
         ModelCache["~/.mcp-local-rag-models/<br/>Xenova/all-MiniLM-L6-v2<br/>(shared embedding model)"]
     end
 
-    subgraph SetupFlow["setup.sh (one-time installer)"]
+    subgraph SetupFlow["setup.mjs (one-time installer)"]
         direction LR
         I1["Check Node 18+<br/>& npm"]
         I2["Install backlog.md<br/>(global)"]

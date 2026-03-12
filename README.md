@@ -27,24 +27,7 @@ npx backlog-setup /path/to/your/project
 
 That's it. Open the project in OpenCode, Claude Code, or Cursor — both MCP servers start automatically.
 
-### Alternative install methods
-
-**curl | bash** (macOS / Linux):
-
-```bash
-curl -LsSf https://raw.githubusercontent.com/Hodnebo/backlog-setup/main/install.sh | bash -s -- /path/to/your/project
-```
-
-**Clone and run directly** (any platform):
-
-```bash
-git clone https://github.com/Hodnebo/backlog-setup.git ~/backlog-setup
-node ~/backlog-setup/setup.mjs /path/to/your/project
-```
-
 ### Options
-
-All flags work with `npx` and the other install methods:
 
 ```bash
 npx backlog-setup --local-cache /path/to/your/project    # Per-repo model cache
@@ -92,14 +75,14 @@ Everything else works identically — MCP tools, semantic search, auto-commit al
 
 ## What the installer does
 
-The installer (`setup.mjs`) is a cross-platform Node.js script that works on macOS, Linux, and Windows. On Unix, the `curl | bash` one-liner delegates to it automatically. It performs these steps:
+The installer (`setup.mjs`) is a cross-platform Node.js script that works on macOS, Linux, and Windows. It performs these steps:
 
 1. Checks Node.js 18+ and npm are available
 2. Installs `backlog.md` globally (if not already present)
 3. Runs `backlog init` with MCP integration mode
 4. If `--submodule`: wires `backlog/` as a git submodule (handles fresh init, conversion from plain dir, and fresh clones)
 5. Installs `lib/` modules, commit hooks, and `mcp-local-rag` to the shared install directory (platform-aware: `~/.local/share/backlog-setup/` on Unix, `%LOCALAPPDATA%\backlog-setup\` on Windows)
-6. Migrates any existing per-project `lib/` and `backlog-commit-hook.sh` to the shared location
+6. Migrates any existing per-project `lib/` to the shared location
 7. Installs the `backlog-semantic-search` skill to `.opencode/skills/`
 8. Writes `.mcp.json` (Claude Code / Cursor) and `opencode.json` (OpenCode) — pointing to the shared install
 9. Updates `.gitignore` to exclude vector DB, model cache, and node_modules
@@ -121,7 +104,6 @@ your-project/
 
 ~/.local/share/backlog-setup/   # Shared install (one copy, all projects)
   lib/                          # Modular RAG server + backlog proxy (10 modules)
-  backlog-commit-hook.sh        # Auto-commit hook (bash, backward compat)
   node_modules/                 # mcp-local-rag dependency
 
 ~/.mcp-local-rag-models/       # Shared embedding model cache (~97MB, one-time download)
@@ -205,7 +187,7 @@ Both the installer and the runtime work natively on Windows — no WSL, Git Bash
 
 | Component | macOS / Linux | Windows |
 |-----------|---------------|---------|
-| **Installer** | `setup.mjs` (via `curl \| bash` or direct) | `setup.mjs` (Node.js) |
+| **Installer** | `setup.mjs` (via `npx` or direct) | `setup.mjs` (via `npx` or direct) |
 | **Shared install** | `~/.local/share/backlog-setup/` | `%LOCALAPPDATA%\backlog-setup\` |
 | **Model cache** | `~/.mcp-local-rag-models/` | `%LOCALAPPDATA%\mcp-local-rag-models\` |
 | **Auto-commit** | `backlog-commit-hook.mjs` | `backlog-commit-hook.mjs` |
@@ -214,7 +196,7 @@ Both the installer and the runtime work natively on Windows — no WSL, Git Bash
 ### Platform-specific notes
 
 - **Path separators**: All Node.js runtime code normalizes backslashes to forward slashes internally. MCP configs use forward slashes (Node.js accepts them on all platforms).
-- **Auto-commit**: The Node.js commit hook (`lib/backlog-commit-hook.mjs`) works on all platforms. The bash hook (`backlog-commit-hook.sh`) is still installed for backward compatibility on Unix.
+- **Auto-commit**: The Node.js commit hook (`lib/backlog-commit-hook.mjs`) works on all platforms.
 - **Exclusion patterns**: The `exclusion.mjs` module normalizes Windows backslash paths before matching, so gitignore-style patterns work identically on all platforms.
 - **Flags**: `--local-cache`, `--submodule`, `--backlog-remote`, `--update`, `--yes`.
 
