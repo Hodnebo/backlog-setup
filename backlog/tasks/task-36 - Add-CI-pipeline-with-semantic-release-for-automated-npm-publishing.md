@@ -4,7 +4,7 @@ title: Add CI pipeline with semantic-release for automated npm publishing
 status: In Progress
 assignee: []
 created_date: '2026-03-12 13:26'
-updated_date: '2026-03-12 13:29'
+updated_date: '2026-03-12 13:33'
 labels:
   - ci
   - dx
@@ -70,3 +70,9 @@ Set up GitHub Actions CI that runs tests on PRs and auto-publishes to npm on mer
 - [ ] #5 Publishing uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret stored
 - [ ] #6 Published packages include provenance attestation (--provenance flag)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## OIDC Research Findings\n\n`@semantic-release/npm` v13.1.x+ natively supports npm Trusted Publishing (OIDC). No split approach needed — semantic-release handles versioning, npm publish, git tag, and GitHub release in one step.\n\n### Hard Requirements\n- **Node 22.14+** in the release workflow (npm 11.5.1+ required for OIDC)\n- **`id-token: write`** permission on the **job** level (not just workflow level)\n- **Trusted Publisher configured** on npmjs.com before first publish\n- **`repository` field** in package.json must match the GitHub repo configured as trusted publisher\n\n### One-Time Manual Setup (npmjs.com)\n1. Go to https://www.npmjs.com/package/backlog-setup/access\n2. Under Trusted Publishing, click \"Add GitHub Actions as a trusted publisher\"\n3. Configure:\n   - Repository owner: `Hodnebo`\n   - Repository name: `backlog-setup`\n   - Workflow filename: `release.yml`\n   - Environment: (leave empty)\n4. Save\n\n### Provenance\nProvenance attestations are generated automatically with OIDC — no `--provenance` flag needed. We added `publishConfig.provenance: true` in package.json for explicitness.\n\n### Gotchas (from semantic-release/npm#1069)\n- Old `@semantic-release/npm` versions don't have OIDC → ensure `semantic-release@^24` pulls the right plugin version\n- Node < 22.14 silently fails OIDC and falls through to NPM_TOKEN check → ENONPMTOKEN error\n- `id-token: write` must be on the job, not just top-level permissions"
+<!-- SECTION:NOTES:END -->
