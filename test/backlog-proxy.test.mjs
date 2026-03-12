@@ -433,18 +433,12 @@ describe("backlog-proxy — tool dispatching", () => {
     assert.equal(result.content[0].text, "real response");
   });
 
-  it("handler auto-chains task_edit with status Done into task_complete", async () => {
+  it("handler returns hard error for task_edit with status Done", async () => {
     if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
 
-    const clientCallTool = mock.fn((opts) => {
-      if (opts.name === "task_edit") {
-        return { content: [{ type: "text", text: "status updated" }] };
-      }
-      if (opts.name === "task_complete") {
-        return { content: [{ type: "text", text: "task completed" }] };
-      }
-      return { content: [{ type: "text", text: "unexpected" }] };
-    });
+    const clientCallTool = mock.fn(() => ({
+      content: [{ type: "text", text: "should not be called" }],
+    }));
     const mockClient = { callTool: clientCallTool };
 
     const handler = proxy.createToolHandler(mockClient);
@@ -453,36 +447,23 @@ describe("backlog-proxy — tool dispatching", () => {
       status: "Done",
     });
 
-    // Should have called BOTH task_edit and task_complete
+    // Should NOT have called the real client at all
     assert.equal(
       clientCallTool.mock.callCount(),
-      2,
-      "Should call task_edit then task_complete"
-    );
-    assert.equal(
-      clientCallTool.mock.calls[0].arguments[0].name,
-      "task_edit",
-      "First call should be task_edit"
-    );
-    assert.equal(
-      clientCallTool.mock.calls[1].arguments[0].name,
-      "task_complete",
-      "Second call should be task_complete"
-    );
-    assert.deepEqual(
-      clientCallTool.mock.calls[1].arguments[0].arguments,
-      { id: "TASK-1" },
-      "task_complete should receive the task id"
+      0,
+      "Should not forward task_edit with status Done to client"
     );
 
-    // Result should include the notice
+    // Should return the hard error
+    assert.ok(result.isError, "Result should be an error");
     assert.ok(
-      result.content[0].text.includes("automatically upgraded"),
-      "Result should include upgrade notice"
+      result.content[0].text.includes("backlog_task_complete"),
+      "Error should mention backlog_task_complete"
     );
-    assert.ok(
-      !result.isError,
-      "Result should NOT be an error (auto-chain succeeds)"
+    assert.equal(
+      result.content[0].text,
+      proxy.DONE_VIA_EDIT_ERROR,
+      "Error text should match DONE_VIA_EDIT_ERROR constant"
     );
   });
 
@@ -520,5 +501,104 @@ describe("backlog-proxy — tool dispatching", () => {
 
     assert.equal(clientCallTool.mock.callCount(), 1, "Should forward edits without status");
     assert.equal(result.content[0].text, "edit succeeded");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// task_complete interception
+// ---------------------------------------------------------------------------
+
+describe("backlog-proxy — task_complete interception", () => {
+  let proxy;
+
+  it("auto-sets status to Done before forwarding task_complete", async () => {
+    proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
+
+    const clientCallTool = mock.fn((opts) => {
+      if (opts.name === "task_edit") {
+        return { content: [{ type: "text", text: "status updated" }] };
+      }
+      if (opts.name === "task_complete") {
+        return { content: [{ type: "text", text: "task completed and moved" }] };
+      }
+      return { content: [{ type: "text", text: "unexpected" }] };
+    });
+    const mockClient = { callTool: clientCallTool };
+
+    const handler = proxy.createToolHandler(mockClient);
+    const result = await handler("task_complete", { id: "TASK-5" });
+
+    // Should have called task_edit(status: Done) THEN task_complete
+    assert.equal(
+      clientCallTool.mock.callCount(),
+      2,
+      "Should call task_edit then task_complete"
+    );
+    assert.equal(
+      clientCallTool.mock.calls[0].arguments[0].name,
+      "task_edit",
+      "First call should be task_edit"
+    );
+    assert.deepEqual(
+      clientCallTool.mock.calls[0].arguments[0].arguments,
+      { id: "TASK-5", status: "Done" },
+      "task_edit should set status to Done"
+    );
+    assert.equal(
+      clientCallTool.mock.calls[1].arguments[0].name,
+      "task_complete",
+      "Second call should be task_complete"
+    );
+    assert.deepEqual(
+      clientCallTool.mock.calls[1].arguments[0].arguments,
+      { id: "TASK-5" },
+      "task_complete should receive the task id"
+    );
+
+    // Result should be the upstream task_complete response (not modified)
+    assert.equal(result.content[0].text, "task completed and moved");
+  });
+
+  it("works when task is already in Done status (no double-edit harm)", async () => {
+    if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
+
+    const clientCallTool = mock.fn((opts) => {
+      if (opts.name === "task_edit") {
+        // Upstream silently accepts setting Done on an already-Done task
+        return { content: [{ type: "text", text: "no-op" }] };
+      }
+      if (opts.name === "task_complete") {
+        return { content: [{ type: "text", text: "completed" }] };
+      }
+      return { content: [{ type: "text", text: "unexpected" }] };
+    });
+    const mockClient = { callTool: clientCallTool };
+
+    const handler = proxy.createToolHandler(mockClient);
+    const result = await handler("task_complete", { id: "TASK-7" });
+
+    // Still calls both — the edit is a harmless no-op when already Done
+    assert.equal(clientCallTool.mock.callCount(), 2);
+    assert.equal(result.content[0].text, "completed");
+  });
+
+  it("returns upstream result directly (no wrapping or notice)", async () => {
+    if (!proxy) proxy = await import(join(ROOT, "lib/backlog-proxy.mjs"));
+
+    const upstreamResponse = {
+      content: [{ type: "text", text: "Task TASK-3 completed successfully" }],
+    };
+    const clientCallTool = mock.fn((opts) => {
+      if (opts.name === "task_complete") return upstreamResponse;
+      return { content: [{ type: "text", text: "ok" }] };
+    });
+    const mockClient = { callTool: clientCallTool };
+
+    const handler = proxy.createToolHandler(mockClient);
+    const result = await handler("task_complete", { id: "TASK-3" });
+
+    // Should return upstream response unchanged
+    assert.equal(result, upstreamResponse, "Should return upstream response object directly");
+    assert.ok(!result.isError, "Should not be an error");
   });
 });
