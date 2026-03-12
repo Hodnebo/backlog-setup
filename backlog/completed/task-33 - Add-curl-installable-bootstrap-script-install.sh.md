@@ -1,7 +1,7 @@
 ---
 id: TASK-33
 title: Add curl-installable bootstrap script (install.sh)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-03-12 12:09'
 updated_date: '2026-03-12 12:10'
