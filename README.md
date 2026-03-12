@@ -19,52 +19,45 @@ Combines [Backlog.md](https://github.com/MrLesk/Backlog.md) (markdown kanban + M
 
 ## Quick start
 
-### macOS / Linux
+Works on macOS, Linux, and Windows — anywhere Node.js runs:
+
+```bash
+npx backlog-setup /path/to/your/project
+```
+
+That's it. Open the project in OpenCode, Claude Code, or Cursor — both MCP servers start automatically.
+
+### Alternative install methods
+
+**curl | bash** (macOS / Linux):
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/Hodnebo/backlog-setup/main/install.sh | bash -s -- /path/to/your/project
 ```
 
-Or clone and run directly:
+**Clone and run directly** (any platform):
 
 ```bash
 git clone https://github.com/Hodnebo/backlog-setup.git ~/backlog-setup
-~/backlog-setup/setup.sh /path/to/your/project
-```
-
-### Windows
-
-```powershell
-git clone https://github.com/Hodnebo/backlog-setup.git $HOME\backlog-setup
-node $HOME\backlog-setup\setup.mjs C:\path\to\your\project
+node ~/backlog-setup/setup.mjs /path/to/your/project
 ```
 
 ### Options
 
-To use a per-repo model cache instead of the shared one:
+All flags work with `npx` and the other install methods:
 
 ```bash
-# macOS/Linux
-~/backlog-setup/setup.sh --local-cache /path/to/your/project
-
-# Windows
-node $HOME\backlog-setup\setup.mjs --local-cache C:\path\to\your\project
+npx backlog-setup --local-cache /path/to/your/project    # Per-repo model cache
+npx backlog-setup --submodule /path/to/your/project       # Backlog as git submodule
+npx backlog-setup --yes /path/to/your/project             # Skip interactive prompts
 ```
-
-That's it. Open the project in OpenCode, Claude Code, or Cursor — both MCP servers start automatically.
 
 ### Updating existing installations
 
 Re-running the installer always refreshes the shared install, so all projects get updated lib/ code automatically. To also refresh per-project MCP configs and the AGENTS.md workflow section:
 
 ```bash
-# macOS/Linux
-curl -LsSf https://raw.githubusercontent.com/Hodnebo/backlog-setup/main/install.sh | bash -s -- --update /path/to/your/project
-# or from a local clone:
-~/backlog-setup/setup.sh --update /path/to/your/project
-
-# Windows
-node $HOME\backlog-setup\setup.mjs --update C:\path\to\your\project
+npx backlog-setup --update /path/to/your/project
 ```
 
 This merges the latest backlog server configs into existing MCP files (preserving other servers) and refreshes the AGENTS.md workflow section. Without `--update`, existing per-project configs are skipped.
@@ -78,13 +71,13 @@ By default, `backlog/` is a plain directory tracked by your project's git. For t
 **With an existing remote repo for backlog:**
 
 ```bash
-~/backlog-setup/setup.sh --submodule --backlog-remote git@github.com:org/project-backlog.git /path/to/project
+node ~/backlog-setup/setup.mjs --submodule --backlog-remote git@github.com:org/project-backlog.git /path/to/project
 ```
 
 **Without a remote (local-only, add remote later):**
 
 ```bash
-~/backlog-setup/setup.sh --submodule /path/to/project
+node ~/backlog-setup/setup.mjs --submodule /path/to/project
 ```
 
 This creates a local bare repo at `.backlog-repo.git` as the submodule source. To add a real remote later:
@@ -99,7 +92,7 @@ Everything else works identically — MCP tools, semantic search, auto-commit al
 
 ## What the installer does
 
-Both `setup.sh` (macOS/Linux) and `setup.mjs` (Windows/cross-platform) perform the same steps:
+The installer (`setup.mjs`) is a cross-platform Node.js script that works on macOS, Linux, and Windows. On Unix, the `curl | bash` one-liner delegates to it automatically. It performs these steps:
 
 1. Checks Node.js 18+ and npm are available
 2. Installs `backlog.md` globally (if not already present)
@@ -123,7 +116,7 @@ your-project/
   backlog/                  # Kanban data (tasks, docs, milestones) — commit this
   .mcp.json                 # MCP config for Claude Code / Cursor
   opencode.json             # MCP config for OpenCode
-  .opencode/skills/         # AI agent skills (installed by setup.sh)
+  .opencode/skills/         # AI agent skills (installed by setup.mjs)
   .lancedb/                 # Vector database (gitignored)
 
 ~/.local/share/backlog-setup/   # Shared install (one copy, all projects)
@@ -212,7 +205,7 @@ Both the installer and the runtime work natively on Windows — no WSL, Git Bash
 
 | Component | macOS / Linux | Windows |
 |-----------|---------------|---------|
-| **Installer** | `setup.sh` (bash) | `setup.mjs` (Node.js) |
+| **Installer** | `setup.mjs` (via `curl \| bash` or direct) | `setup.mjs` (Node.js) |
 | **Shared install** | `~/.local/share/backlog-setup/` | `%LOCALAPPDATA%\backlog-setup\` |
 | **Model cache** | `~/.mcp-local-rag-models/` | `%LOCALAPPDATA%\mcp-local-rag-models\` |
 | **Auto-commit** | `backlog-commit-hook.mjs` | `backlog-commit-hook.mjs` |
@@ -223,7 +216,7 @@ Both the installer and the runtime work natively on Windows — no WSL, Git Bash
 - **Path separators**: All Node.js runtime code normalizes backslashes to forward slashes internally. MCP configs use forward slashes (Node.js accepts them on all platforms).
 - **Auto-commit**: The Node.js commit hook (`lib/backlog-commit-hook.mjs`) works on all platforms. The bash hook (`backlog-commit-hook.sh`) is still installed for backward compatibility on Unix.
 - **Exclusion patterns**: The `exclusion.mjs` module normalizes Windows backslash paths before matching, so gitignore-style patterns work identically on all platforms.
-- **`setup.mjs`** supports all the same flags as `setup.sh`: `--local-cache`, `--submodule`, `--backlog-remote`, `--update`, `--yes`.
+- **Flags**: `--local-cache`, `--submodule`, `--backlog-remote`, `--update`, `--yes`.
 
 ## Customization
 
@@ -248,7 +241,7 @@ The embedding model (~97MB) is stored in `~/.mcp-local-rag-models` and shared ac
 To use a per-project cache instead (e.g., for offline/isolated environments), pass `--local-cache` during setup:
 
 ```bash
-~/backlog-setup/setup.sh --local-cache
+node ~/backlog-setup/setup.mjs --local-cache
 ```
 
 This stores the model in `TARGET_DIR/.mcp-local-rag-models` instead of the shared location.

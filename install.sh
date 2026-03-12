@@ -4,8 +4,11 @@ set -euo pipefail
 # ─────────────────────────────────────────────────────────────────────────────
 # backlog-setup bootstrap installer
 #
-# Curl-pipe-bash wrapper around setup.sh. Clones the repo to a temp directory,
-# runs setup.sh with all forwarded arguments, then cleans up.
+# Preferred method: npx backlog-setup /path/to/project
+#
+# This curl-pipe-bash wrapper is an alternative for Unix systems. It clones
+# the repo to a temp directory, runs the cross-platform Node.js installer
+# (setup.mjs), then cleans up.
 #
 # Usage:
 #   curl -LsSf https://raw.githubusercontent.com/Hodnebo/backlog-setup/main/install.sh | bash
@@ -40,6 +43,10 @@ if ! command -v git &>/dev/null; then
   fail "git is required but not installed. Install git first, then re-run this script."
 fi
 
+if ! command -v node &>/dev/null; then
+  fail "Node.js is required but not installed. Install from https://nodejs.org then re-run."
+fi
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Clone and run
 # ─────────────────────────────────────────────────────────────────────────────
@@ -50,6 +57,6 @@ git clone --depth 1 --quiet "$REPO_URL" "$CLONE_DIR" || \
   fail "Could not clone $REPO_URL — check your network connection."
 ok "Repository cloned"
 
-info "Running setup.sh..."
+info "Running setup..."
 echo ""
-bash "$CLONE_DIR/setup.sh" "$@"
+node "$CLONE_DIR/setup.mjs" "$@"
