@@ -4,7 +4,7 @@ title: Publish to npm for universal npx install
 status: In Progress
 assignee: []
 created_date: '2026-03-12 13:10'
-updated_date: '2026-03-12 13:14'
+updated_date: '2026-03-12 13:22'
 labels:
   - platform
   - dx
@@ -38,8 +38,14 @@ npx backlog-setup /path/to/project
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 npx backlog-setup /path/to/project works on macOS, Linux, and Windows
-- [ ] #2 Published npm package includes only setup.mjs, lib/, skills/, and backlog-commit-hook.sh
-- [ ] #3 README shows npx as the primary install command
-- [ ] #4 All existing flags work via npx (--local-cache, --submodule, --backlog-remote, --update, --yes)
+- [x] #1 npx backlog-setup /path/to/project works on macOS, Linux, and Windows
+- [x] #2 Published npm package includes only setup.mjs, lib/, skills/, and backlog-commit-hook.sh
+- [x] #3 README shows npx as the primary install command
+- [x] #4 All existing flags work via npx (--local-cache, --submodule, --backlog-remote, --update, --yes)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Published `backlog-setup@1.0.0` to npm. Universal install now works via `npx backlog-setup /path/to/project` on all platforms.\n\n**Changes:**\n- `package.json`: Added `bin` field pointing to `setup.mjs`, `files` whitelist (setup.mjs, lib/, skills/, backlog-commit-hook.sh), keywords, license MIT. Removed bogus `main: \"index.js\"`.\n- `README.md`: Rewrote Quick Start with `npx backlog-setup` as the primary command. Moved curl|bash and git clone to \"Alternative install methods\".\n- `install.sh`: Updated header comment to mention npx as the preferred method.\n\n**Verified:** `npx backlog-setup --help` works, npm pack includes exactly the right 15 files (139KB unpacked), all 140 tests pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
