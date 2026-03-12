@@ -1,10 +1,10 @@
 ---
 id: TASK-36
 title: Add CI pipeline with semantic-release for automated npm publishing
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-03-12 13:26'
-updated_date: '2026-03-12 13:27'
+updated_date: '2026-03-12 13:29'
 labels:
   - ci
   - dx
