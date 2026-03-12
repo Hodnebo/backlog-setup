@@ -4,6 +4,7 @@ title: Add CI pipeline with semantic-release for automated npm publishing
 status: To Do
 assignee: []
 created_date: '2026-03-12 13:26'
+updated_date: '2026-03-12 13:27'
 labels:
   - ci
   - dx
@@ -40,9 +41,14 @@ Set up GitHub Actions CI that runs tests on PRs and auto-publishes to npm on mer
    - Plugins: `@semantic-release/commit-analyzer`, `@semantic-release/release-notes-generator`, `@semantic-release/npm`, `@semantic-release/github`
    - Default branch: `main`
 
-4. **GitHub repo secrets needed:**
-   - `NPM_TOKEN` — npm automation/granular access token (bypasses 2FA)
-   - `GITHUB_TOKEN` — built-in, no setup needed (used for GitHub releases)
+4. **Authentication — npm Trusted Publishing (OIDC):**
+   - No `NPM_TOKEN` secret needed. GitHub Actions authenticates directly with npm via OpenID Connect.
+   - The release workflow needs `permissions: id-token: write` to request the OIDC token.
+   - The npm package must be linked to the GitHub repo as a trusted publisher:
+     1. Go to npmjs.com → `backlog-setup` → Settings → Trusted Publishing
+     2. Add GitHub Actions as a trusted publisher (repo: `Hodnebo/backlog-setup`, workflow: `release.yml`, environment: optional)
+   - The workflow uses `--provenance` flag on `npm publish` to attach cryptographic provenance.
+   - `GITHUB_TOKEN` — built-in, no setup needed (used for GitHub releases).
 
 5. **Conventional commits convention** — adopt going forward:
    - `feat:` → minor bump (1.x.0)
@@ -51,6 +57,8 @@ Set up GitHub Actions CI that runs tests on PRs and auto-publishes to npm on mer
    - `chore:`, `docs:`, `ci:`, `test:` → no release
 
 6. **Dev dependencies to add:** `semantic-release` (and its default plugins)
+
+7. **Note:** Check if semantic-release supports npm Trusted Publishing (OIDC) natively. If not, may need to split: semantic-release for versioning/changelog/git-tag, then a separate step for `npm publish --provenance` using the OIDC token.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -59,5 +67,6 @@ Set up GitHub Actions CI that runs tests on PRs and auto-publishes to npm on mer
 - [ ] #2 Merging a feat: or fix: commit to main publishes a new version to npm automatically
 - [ ] #3 Changes only to backlog/ or docs do not trigger a release
 - [ ] #4 GitHub releases are created with auto-generated release notes
-- [ ] #5 NPM_TOKEN secret is documented in the task (user must add manually)
+- [ ] #5 Publishing uses npm Trusted Publishing (OIDC) — no NPM_TOKEN secret stored
+- [ ] #6 Published packages include provenance attestation (--provenance flag)
 <!-- AC:END -->
