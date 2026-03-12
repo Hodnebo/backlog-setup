@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-03-12 08:52'
-updated_date: '2026-03-12 10:09'
+updated_date: '2026-03-12 11:59'
 labels:
   - bug
   - backlog-proxy
@@ -55,3 +55,9 @@ The fix in `createToolHandler()` should: detect `toolName === "task_complete"`, 
 
 **Scope addition:** Remove the `isDoneViaEdit` auto-chain in `createToolHandler()`. With "Done" already stripped from the `task_edit` enum and all guides warning against it, agents won't call this path. Replace with a hard error return (`DONE_VIA_EDIT_ERROR`). The `isDoneViaEdit()` detection function and `DONE_VIA_EDIT_ERROR` constant stay (used for the error), but `DONE_VIA_EDIT_NOTICE` and the two-call chain can go.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Proxy now intercepts `task_complete` and auto-sets status to Done before forwarding to upstream (which requires it). The old `isDoneViaEdit` auto-chain (`task_edit(status=Done)` → silently complete) is replaced with a hard error directing agents to use `task_complete`. Removed `DONE_VIA_EDIT_NOTICE` constant/export. 3 new tests for the interception path, 1 updated test for the hard error. 114 tests pass.
+<!-- SECTION:FINAL_SUMMARY:END -->
