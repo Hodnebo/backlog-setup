@@ -4,7 +4,7 @@ title: Add curl-installable bootstrap script (install.sh)
 status: In Progress
 assignee: []
 created_date: '2026-03-12 12:09'
-updated_date: '2026-03-12 12:09'
+updated_date: '2026-03-12 12:10'
 labels:
   - enhancement
   - dx
@@ -38,9 +38,9 @@ The bootstrap script should:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 install.sh is a self-contained shell script that works via curl-pipe-bash
-- [ ] #2 Clones repo to temp dir (shallow), runs setup.sh with forwarded args, cleans up on exit
-- [ ] #3 Works for fresh installs and --update
-- [ ] #4 Fails gracefully with clear error if git is not available
-- [ ] #5 README updated with the curl install command
+- [x] #1 install.sh is a self-contained shell script that works via curl-pipe-bash
+- [x] #2 Clones repo to temp dir (shallow), runs setup.sh with forwarded args, cleans up on exit
+- [x] #3 Works for fresh installs and --update
+- [x] #4 Fails gracefully with clear error if git is not available
+- [x] #5 README updated with the curl install command
 <!-- AC:END -->
