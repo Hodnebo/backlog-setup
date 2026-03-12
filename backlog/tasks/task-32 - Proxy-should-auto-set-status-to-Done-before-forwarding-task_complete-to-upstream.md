@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-03-12 08:52'
+updated_date: '2026-03-12 08:53'
 labels:
   - bug
   - backlog-proxy
@@ -14,6 +15,9 @@ references:
   - lib/backlog-proxy.mjs
   - test/backlog-proxy.test.mjs
   - lib/workflow-guides.mjs
+documentation:
+  - >-
+    https://github.com/MrLesk/Backlog.md/blob/0761f314d1175448c0987f15c7514ebeb1f8eff0/src/mcp/tools/tasks/handlers.ts#L513-L538
 priority: high
 ---
 
@@ -36,3 +40,15 @@ The proxy handles the wrong-tool case (`task_edit` with status "Done" → auto-c
 - [ ] #3 Test coverage for direct `task_complete` interception with non-Done status
 - [ ] #4 Existing auto-chain behavior for `task_edit(status=Done)` is preserved
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+**Upstream source confirmation** (MrLesk/Backlog.md @ 0761f31):
+
+`src/mcp/tools/tasks/handlers.ts#L513-L538` has an explicit `isDoneStatus()` gate that throws `McpError("Task ${id} is not Done. Set status to \"Done\" with task_edit before completing it.", "VALIDATION_ERROR")` if the task isn't in Done status.
+
+`isDoneStatus()` does a substring match: `status.includes("done") || status.includes("complete")` — so any status containing those words passes.
+
+The fix in `createToolHandler()` should: detect `toolName === "task_complete"`, call `task_edit(id, status: "Done")` first, then forward to upstream `task_complete`. Should also handle the case where the task is already Done (skip the edit).
+<!-- SECTION:NOTES:END -->
