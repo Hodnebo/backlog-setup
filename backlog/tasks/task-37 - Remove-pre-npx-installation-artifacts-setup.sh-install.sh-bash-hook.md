@@ -1,9 +1,10 @@
 ---
 id: TASK-37
 title: 'Remove pre-npx installation artifacts (setup.sh, install.sh, bash hook)'
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-03-12 14:06'
+updated_date: '2026-03-12 14:15'
 labels:
   - cleanup
   - developer-experience
