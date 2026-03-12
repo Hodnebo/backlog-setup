@@ -4,7 +4,7 @@ title: 'Remove pre-npx installation artifacts (setup.sh, install.sh, bash hook)'
 status: In Progress
 assignee: []
 created_date: '2026-03-12 14:06'
-updated_date: '2026-03-12 14:15'
+updated_date: '2026-03-12 14:19'
 labels:
   - cleanup
   - developer-experience
@@ -36,11 +36,17 @@ Now that `npx backlog-setup` is the sole installation method, several files and 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 setup.sh and install.sh are deleted from the repo
-- [ ] #2 backlog-commit-hook.sh is deleted and removed from package.json files array
-- [ ] #3 README.md no longer mentions curl|bash or git clone as install methods
-- [ ] #4 AGENTS.md no longer references setup.sh
-- [ ] #5 setup.mjs header comment no longer references setup.sh
+- [x] #1 setup.sh and install.sh are deleted from the repo
+- [x] #2 backlog-commit-hook.sh is deleted and removed from package.json files array
+- [x] #3 README.md no longer mentions curl|bash or git clone as install methods
+- [x] #4 AGENTS.md no longer references setup.sh
+- [x] #5 setup.mjs header comment no longer references setup.sh
 - [ ] #6 npx backlog-setup still works (the only install path)
-- [ ] #7 No broken references to removed files remain in tracked files (excluding backlog/completed/)
+- [x] #7 No broken references to removed files remain in tracked files (excluding backlog/completed/)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+The bash commit hook backward-compat in setup.mjs was removed entirely — the Node.js hook (lib/backlog-commit-hook.mjs) is cross-platform and sufficient. Task-26 (setup.sh error handling) and task-30 (setup.sh --update flag) in backlog/tasks/ are now obsolete but left as-is per out-of-scope rule.
+<!-- SECTION:NOTES:END -->
