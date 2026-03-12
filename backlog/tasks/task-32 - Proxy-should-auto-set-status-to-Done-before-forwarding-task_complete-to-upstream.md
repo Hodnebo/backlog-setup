@@ -38,9 +38,8 @@ The proxy handles the wrong-tool case (`task_edit` with status "Done" → auto-c
 - [ ] #1 Calling `task_complete` on a task in any status (To Do, In Progress, Draft) succeeds — proxy auto-sets status to Done before forwarding
 - [ ] #2 Calling `task_complete` on a task already in Done status still works (no double-edit)
 - [ ] #3 Test coverage for direct `task_complete` interception with non-Done status
-- [ ] #4 Existing auto-chain behavior for `task_edit(status=Done)` is preserved
-- [ ] #5 The `isDoneViaEdit` auto-chain is removed — `task_edit(status="Done")` returns a hard error (`DONE_VIA_EDIT_ERROR`)
-- [ ] #6 Tests for the old auto-chain behavior are updated to expect a hard error instead
+- [ ] #4 The `isDoneViaEdit` auto-chain is removed — `task_edit(status="Done")` returns a hard error (`DONE_VIA_EDIT_ERROR`)
+- [ ] #5 Tests for the old auto-chain behavior are updated to expect a hard error instead
 <!-- AC:END -->
 
 ## Implementation Notes
