@@ -318,6 +318,9 @@ cd "$TARGET_DIR"
 
 if [ -d "backlog" ] && [ -f "backlog/config.yml" ]; then
   ok "Backlog already initialized"
+elif [ "$SUBMODULE_MODE" = true ] && [ -n "$BACKLOG_REMOTE" ] && [ ! -d "backlog" ]; then
+  # Defer init — submodule add will clone the remote first, then we init inside it
+  info "Deferring backlog init (submodule with remote — will clone first)"
 else
   info "Initializing backlog..."
 
@@ -365,23 +368,26 @@ if [ "$SUBMODULE_MODE" = true ]; then
   elif [ -d "$BACKLOG_DIR" ] && [ ! -d "$BACKLOG_DIR/.git" ]; then
     info "Converting existing backlog/ to a submodule..."
 
-    # Turn backlog/ into its own git repo
-    git -C "$BACKLOG_DIR" init -q
-    git -C "$BACKLOG_DIR" add -A
-    git -C "$BACKLOG_DIR" commit -q -m "Initial backlog content"
-
-    if [ -n "$BACKLOG_REMOTE" ]; then
-      git -C "$BACKLOG_DIR" remote add origin "$BACKLOG_REMOTE"
-      git -C "$BACKLOG_DIR" push -u origin "$(git -C "$BACKLOG_DIR" branch --show-current)" 2>/dev/null || \
-        warn "Could not push to $BACKLOG_REMOTE — push manually later"
-    fi
-
-    # Remove backlog/ from the parent repo tracking and re-add as submodule
     git rm -r --cached backlog >/dev/null 2>&1 || true
-    rm -rf "$BACKLOG_DIR/.git"
 
     if [ -n "$BACKLOG_REMOTE" ]; then
+      # Save local content, clone remote, merge local content on top
+      BACKLOG_TMP=$(mktemp -d)
+      cp -a "$BACKLOG_DIR"/. "$BACKLOG_TMP"/
+      rm -rf "$BACKLOG_DIR"
       git submodule add "$BACKLOG_REMOTE" backlog
+
+      # Copy local content into the submodule (overwrite remote files)
+      cp -a "$BACKLOG_TMP"/. "$BACKLOG_DIR"/
+      rm -rf "$BACKLOG_TMP"
+
+      # Commit and push the merged content inside the submodule
+      git -C "$BACKLOG_DIR" add -A
+      if ! git -C "$BACKLOG_DIR" diff --cached --quiet; then
+        git -C "$BACKLOG_DIR" commit -q -m "Add backlog content from parent project"
+        git -C "$BACKLOG_DIR" push origin "$(git -C "$BACKLOG_DIR" branch --show-current)" 2>/dev/null || \
+          warn "Could not push to $BACKLOG_REMOTE — push manually later"
+      fi
     else
       # No remote: create a bare repo next to the project for the submodule reference
       BARE_REPO="$TARGET_DIR/.backlog-repo.git"
@@ -426,6 +432,34 @@ if [ "$SUBMODULE_MODE" = true ]; then
       # since backlog init runs first). Guard anyway.
       fail "backlog/ does not exist and no --backlog-remote provided. Run without --submodule first, or provide a remote."
     fi
+  fi
+
+  # After submodule setup, ensure backlog is initialized inside it
+  if [ ! -f "$BACKLOG_DIR/config.yml" ]; then
+    info "Initializing backlog inside submodule..."
+    PROJECT_NAME=$(basename "$TARGET_DIR")
+    if git rev-parse --is-inside-work-tree &>/dev/null; then
+      REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+      if [ -n "$REMOTE_URL" ]; then
+        PROJECT_NAME=$(basename "$REMOTE_URL" .git)
+      fi
+    fi
+
+    backlog init "$PROJECT_NAME" --integration-mode mcp --defaults 2>/dev/null || true
+
+    if ! git remote get-url origin &>/dev/null 2>&1; then
+      backlog config set remoteOperations false 2>/dev/null || true
+    fi
+
+    # Commit and push the init content inside the submodule
+    git -C "$BACKLOG_DIR" add -A
+    if ! git -C "$BACKLOG_DIR" diff --cached --quiet; then
+      git -C "$BACKLOG_DIR" commit -q -m "Initialize backlog"
+      git -C "$BACKLOG_DIR" push origin "$(git -C "$BACKLOG_DIR" branch --show-current)" 2>/dev/null || \
+        warn "Could not push backlog init to remote — push manually later"
+    fi
+
+    ok "Backlog initialized inside submodule as '$PROJECT_NAME'"
   fi
 fi
 
@@ -650,6 +684,10 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 
 GITIGNORE_ENTRIES=(
+  "# MCP configs (contain machine-specific absolute paths)"
+  ".mcp.json"
+  "opencode.json"
+  ""
   "# RAG vector database"
   ".lancedb/"
   ""
@@ -665,7 +703,7 @@ GITIGNORE_ENTRIES=(
 
 if [ -f ".gitignore" ]; then
   ADDED=0
-  for entry in ".lancedb/" ".mcp-local-rag-models/" "node_modules/" ".backlog-repo.git"; do
+  for entry in ".mcp.json" "opencode.json" ".lancedb/" ".mcp-local-rag-models/" "node_modules/" ".backlog-repo.git"; do
     if ! grep -qF "$entry" .gitignore; then
       echo "$entry" >> .gitignore
       ADDED=1
