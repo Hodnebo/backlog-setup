@@ -218,6 +218,24 @@ function isGitRepo(cwd) {
 }
 
 /**
+ * Remove stale .git/modules/<name> cache left over from a previous submodule
+ * setup.  Without this cleanup, `git submodule add` fails when the cached
+ * module directory exists with a different remote URL (e.g. SSH vs HTTPS).
+ * @param {string} cwd  - working directory (parent repo)
+ * @param {string} name - submodule path (e.g. "backlog")
+ */
+function cleanStaleSubmoduleCache(cwd, name) {
+  const gitDir = run("git", ["rev-parse", "--git-dir"], { cwd, fallback: "" });
+  if (!gitDir) return;
+  const absGitDir = resolve(cwd, gitDir);
+  const cachedModuleDir = join(absGitDir, "modules", name);
+  if (existsSync(cachedModuleDir)) {
+    info(`Removing stale git module cache: ${cachedModuleDir}`);
+    rmSync(cachedModuleDir, { recursive: true, force: true });
+  }
+}
+
+/**
  * Get git remote origin URL, or empty string.
  * @param {string} cwd
  * @returns {string}
@@ -577,6 +595,7 @@ if (submoduleMode) {
       const backlogTmp = mkdtempSync(join(tmpdir(), "backlog-"));
       cpSync(backlogDir, backlogTmp, { recursive: true });
       rmSync(backlogDir, { recursive: true, force: true });
+      cleanStaleSubmoduleCache(targetDir, "backlog");
       runVerbose("git", ["submodule", "add", backlogRemote, "backlog"], { cwd: targetDir });
 
       // Merge local content into the submodule
@@ -600,6 +619,7 @@ if (submoduleMode) {
       runOk("git", ["-C", backlogDir, "commit", "-q", "-m", "Initial backlog content"]);
       runOk("git", ["clone", "--bare", "-q", backlogDir, bareRepo]);
       rmSync(backlogDir, { recursive: true, force: true });
+      cleanStaleSubmoduleCache(targetDir, "backlog");
       runVerbose("git", ["submodule", "add", bareRepo, "backlog"], { cwd: targetDir });
       info("Local bare repo created at .backlog-repo.git — add a real remote later:");
       info("  cd backlog && git remote set-url origin <url> && git push -u origin main");
@@ -621,12 +641,14 @@ if (submoduleMode) {
 
     rmSync(backlogDir, { recursive: true, force: true });
     runOk("git", ["rm", "-r", "--cached", "backlog"], { cwd: targetDir });
+    cleanStaleSubmoduleCache(targetDir, "backlog");
     runVerbose("git", ["submodule", "add", submoduleUrl, "backlog"], { cwd: targetDir });
     ok(`backlog/ wired as submodule from ${submoduleUrl}`);
 
   // Case E: fresh setup — add submodule from scratch
   } else {
     if (backlogRemote) {
+      cleanStaleSubmoduleCache(targetDir, "backlog");
       runVerbose("git", ["submodule", "add", backlogRemote, "backlog"], { cwd: targetDir });
       ok(`backlog submodule added from ${backlogRemote}`);
     } else {

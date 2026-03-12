@@ -54,7 +54,7 @@ skills/
 
 ## Git
 
-Imperative mood commits, no conventional-commits prefix. Gitignored: `.mcp.json`, `opencode.json`, `.lancedb/`, `.mcp-local-rag-models/`, `node_modules/`. Keep `README.md` updated when changing behavior.
+Conventional commits (`fix:`, `feat:`, `chore:`, `refactor:`, `test:`, `docs:`). Gitignored: `.mcp.json`, `opencode.json`, `.lancedb/`, `.mcp-local-rag-models/`, `node_modules/`. Keep `README.md` updated when changing behavior.
 
 <!-- BACKLOG_WORKFLOW:BEGIN -->
 
